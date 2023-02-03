@@ -1,0 +1,83 @@
+{
+  "DATASETS": [
+    {
+      "DSNAME": "fields",
+      "TABLEPATH": "/root/fields",
+      "VARIABLES": [
+        {
+          "NAME": "ordinal_root",
+          "TYPE": "ORDINAL",
+          "PATH": "/root"
+        },
+        {
+          "NAME": "ordinal_fields",
+          "TYPE": "ORDINAL",
+          "PATH": "/root/fields"
+        },
+        {
+          "NAME": "fields1",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/fields/fields1",
+          "CURRENT_LENGTH": 3
+        },
+        {
+          "NAME": "fields2",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/fields/fields2",
+          "CURRENT_LENGTH": 4
+        },
+        {
+          "NAME": "fields3",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/fields/fields3",
+          "CURRENT_LENGTH": 6
+        },
+        {
+          "NAME": "fields4",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/fields/fields4",
+          "CURRENT_LENGTH": 8
+        }
+      ]
+    },
+    {
+      "DSNAME": "data",
+      "TABLEPATH": "/root/data",
+      "VARIABLES": [
+        {
+          "NAME": "ordinal_root",
+          "TYPE": "ORDINAL",
+          "PATH": "/root"
+        },
+        {
+          "NAME": "ordinal_data",
+          "TYPE": "ORDINAL",
+          "PATH": "/root/data"
+        },
+        {
+          "NAME": "cik",
+          "TYPE": "NUMERIC",
+          "PATH": "/root/data/element1"
+        },
+        {
+          "NAME": "Name",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/data/element2",
+          "CURRENT_LENGTH": 93
+        },
+        {
+          "NAME": "Ticker",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/data/element3",
+          "CURRENT_LENGTH": 8
+        },
+        {
+          "NAME": "Exchange",
+          "TYPE": "CHARACTER",
+          "PATH": "/root/data/element4",
+          "CURRENT_LENGTH": 6
+        }
+      ]
+    }
+  ]
+}
