@@ -55,7 +55,7 @@
           "PATH": "/root/data"
         },
         {
-          "NAME": "Cik",
+          "NAME": "CIK",
           "TYPE": "NUMERIC",
           "PATH": "/root/data/element1"
         },
