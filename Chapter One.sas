@@ -154,8 +154,8 @@ title;
 ods graphics off;
 
 /******************Program 1.9C****************/
-%let smean=0.0067658; %let ssd = 0.04465726;Data FSPX;
-set ustats;
+%let smean=0.0067658; %let ssd = 0.04465726;
+Data FSPX;
 do iter=1 to 100; /*number of replication*/
             do time = 1 to 457; /*Simulation window*/
          	fmret =rand("normal",&smean,&ssd);
@@ -163,7 +163,6 @@ do iter=1 to 100; /*number of replication*/
 		    output;
          end;
          mcount=0;
-	/*sumret is cumulative sum of returns over the sample period*/
      end;
 label fmret='Forecasted Monthly Returns';
 run;
