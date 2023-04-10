@@ -1,4 +1,4 @@
-
+﻿
 
 
 /******************Program 3.7A****************/
@@ -60,7 +60,7 @@ textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center
 titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
 series x=date y=Ret;
 xaxis label= "Date" valuesformat= datetime.;
-yaxis label= "Returns" valuesformat= percent8.2 values=(-0.1 to 0.01 by .02);
+yaxis label= "Returns" valuesformat= percent8.2 values=(-0.1 to 0.1 by .02);
 run;
 
 proc univariate data=simul7b;
@@ -139,7 +139,6 @@ do i = 1 to &n;
 	dt=dt+1;
 	Vol[i,1]=intnx('day',InitDate,dt);/*Simulating Date variable*/
 end;
-run series(Vol[,1],Vol[,2]);
 vname ={"Date" "VIX"}; /*specify column and row label*/
 create simul10A from Vol[colname=vname] ;
 append from Vol; close simul10;
@@ -170,7 +169,6 @@ do i = 1 to &n;
 	dt=dt+1;
 	Vol[i,1]=intnx('day',InitDate,dt);/*Simulating Date variable*/
 end;
-call series(vol[,1],vol[,2]);
 vname ={"Date" "VIX"}; /*specify column and row label*/
 create simul10B from Vol[colname=vname] ;
 append from Vol; close simul10B;
@@ -525,7 +523,7 @@ textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center
 titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
 histogram npv / nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=bipb );
 density npv/ legendlabel= "(Normal Density Plot for Project's NPV)" ;
-yaxis values=(0 to 20 by 2.5);
+yaxis values=(0 to 35 by 5);
 run;
 
 proc sgplot data=simul11;
@@ -534,7 +532,7 @@ textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center
 titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
 histogram qty / nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=bipb );
 density qty/ legendlabel= "(Normal Density Plot for Project's NPV)" ;
-yaxis values=(0 to 20 by 2.5);
+yaxis values=(0 to 20 by 5);
 run;
 
 
