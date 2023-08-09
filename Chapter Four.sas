@@ -1,5 +1,4 @@
-*libname finsas 'C:\Users\Owner\OneDrive - Widener University\Financial Data Science\Data\Bookdata';
-
+﻿
 /*********Program 4.01**************************************
 /*SAS Codes to show different parametric method of estimation*/
 %datapull(industr,industr.sas7bdat);
@@ -15,7 +14,7 @@ run;
 /*Estimating Kernel Density Using PROC UNIVARIATE*/
 title 'Distribution of Financial Services Industry Returns';
 proc univariate data=industr noprint;
-	histogram  finan/ 
+	histogram  finance/ 
 		kernel(c = 0.5 1 2 
 		noprint  
 		k=normal)
@@ -197,7 +196,7 @@ ods graphics on;
 
 proc syslin data=market_data 2sls;
 	endogenous dret vret;
-	instruments rbond roil rexer rvix rgvix rovix ldret lvret;
+	instruments rbond roil rexr rvix rgvix rovix ldret lvret;
 return:
 	model dret= vret lvret rbond roil rexr;
 volume:
@@ -224,7 +223,7 @@ run;
 
 /*********Program 4.16**************************************/
 /*Forecasting Monthly Trading Volume on the S&P 500 using Exponsential Smoothing Model*/
-%datapull(spx,rspx_monthly7bdat);
+%datapull(spx,rspx_monthly.sas7bdat);
 ods graphics on;
 
 proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
