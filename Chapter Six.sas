@@ -1,1238 +1,296 @@
-/*********Program 6.01**************************************
+/*********Program 6.1**************************************
+/*SAS Codes to show different parametric method of estimation*/
+%datapull(industr,industr.sas7bdat);
 
-/*Simple Proc OPTMODEL Problem*/
-proc optmodel;
-	var x >= 0 , y >= 0;
-	min f = 7*x +5*y;
-	con 4*x + 3*y >= 19;
-	con  x + y <= 5;
-	solve;
-	print x y;
-quit;
-
-
-/*********Program 6.02**************************************/
-/*Using PROC OPTMODEL to Solve Simple Optimization Problem*/
-proc optmodel;
-	var x1 >= 0.0 , x2 >= 0.0;
-	max Z = 4*x1 +6*x2;
-	con 4.5*x1 + 8*x2 <= 6.0;
-	con x1 + x2= 1.0;
-	solve with lp / algorithm=ps;
-	print x1 x2;
-	print _ACON_.dual _ACON_.body;
-	expand;
-quit;
-
-
-/*********Program 6.03**************************************/
-/*Solving the Dual of an Optimization Problem using PROC OPTMODEL*/
-proc optmodel;
-	var y1 >= 0.0 , y2 >= 0.0;
-	min Z = 6*y1 +y2;
-	con 4.5*y1 + y2 >=4.0;
-	con  8.0*y1 + y2= 6.0;
-	solve with lp / algorithm=ps;
-	print y1 y2;
-	print _ACON_.dual _ACON_.body;
-	expand;
-quit;
-
-
-/*********Program 6.04**************************************/
-/*Solving Integer Linear Programming (ILP) Problem (Profit Maximization) Using PROC OPTMODEL*/
-proc optmodel;
-	/* declare variables */
-	var Sedans >= 0 integer, SUVs >= 0 integer, Trucks>=0 integer;
-
-	/* declare constraints */
-	con Labor: 40*Sedans + 50*SUVs+ 60*Trucks <= 1000000;
-	con Equipment: 35*Sedans + 45*SUVs + 60*Trucks<=2000000;
-	con Materials: 40*Sedans + 60*SUVs + 75*Trucks <= 2000000;
-
-	/* declare objective */
-	max NetProfit = 26000*Sedans + 37500*SUVs + 45000*Trucks 
-		- 50 * (40*Sedans + 50*SUVs+ 60*Trucks) 
-		- 35 * (35*Sedans + 45*SUVs + 60*Trucks) 
-		- 400 * (40*Sedans + 60*SUVs + 75*Trucks);
-	expand;
-	solve;
-	print Sedans SUVs Trucks;
-quit;
-
-
-/*********Program 6.05A**************************************/
-/*Reading Data into OPTMODEL Procedure*/
-proc optmodel;
-set VEHICLES = /Sedan SUVs Trucks/;
-num sales_price {VEHICLES} = [26000 37500 45000];
-print sales_price;
-
-/*********Program 6.05B**************************************/
-/*Reading SAS Dataset into OPTMODEL Procedure*/
-
-data price_data;
-	input Type $ Price;
-	datalines;
-Sedan 26000
-SUVs 37500
-Trucks 45000
-;
-run;
-
-proc optmodel;
-	set <str> VEHICLES;
-	num sales_price {VEHICLES};
-	read data price_data into VEHICLES=[Type]
-		sales_price=Price;
-	print  sales_price dollar8.;
-
-
-/*********Program 6.05C**************************************/
-/*Reading Data into OPTMODEL Procedure*/
-proc optmodel;
-set <str> VEHICLES;
-num sales_price {VEHICLES};
-read data price_data into VEHICLES=[Type]
-sales_price=Price;
-print  sales_price dollar8.;
-impvar Revenue=
-		sum{p in VEHICLES} sales_price[p];
-		print Revenue dollar8.;
-quit;
-
-
-/*********Program 6.05D**************************************/
-/*Reading Data into OPTMODEL Procedure*/
-data resource_data;
-	format Items $10.;
-	input Items $ Costs Available;
-	datalines;
-Labor  50 1000000 
-Equipment 35 2000000 
-Material  400 2000000 
-;
-run;
-
-data production_data;
-	input Types $ Price Labor Equipment Material;
-	datalines;
-Sedan 26000 40 35 40
-SUVs 37500 50 45 60
-Trucks 45000 60 60 75
-;
+proc model data=industr;
+	finance = constant +beta*mrp;
+	fit finance / ols; /*OLS*/
+	fit finance / fiml; /*MLE*/
+	fit finance / gmm;/*GMM*/
 run;
 
 
-/*********Program 6.05E**************************************/
-/*Using Index Set, Arrays, and SAS  dataset in OPTMODEL Procedure*/
-proc optmodel;
-	set <str> RESOURCES,VEHICLES;
-	num sales_price {VEHICLES};
-	num costs{RESOURCES},available{RESOURCES};
-	num inputs{VEHICLES,RESOURCES};
+/*********Program 6.2**************************************
+/*Estimating Kernel Density Using PROC UNIVARIATE*/
+title 'Distribution of Financial Services Industry Returns';
 
-	/*read data price_data into index sets*/
-	read data resource_data into RESOURCES=[Items]
-		costs available;
-	read data production_data into VEHICLES=[Types]
-		{r in RESOURCES} <inputs[Types,r]=col(r)>
-		sales_price=price;
-	
-	/*Validate Data Read into Problem*/
-	print costs available;
-	print sales_price inputs;
-
-	/*Declare Variables*/
-	var Units{VEHICLES}>=0 integer;
-	impvar Revenue=
-		sum{p in VEHICLES} sales_price[p]*Units[p];
-	impvar Usage {r in RESOURCES}=
-		sum{p in VEHICLES} Units[p]*Inputs[p,r];
-	impvar ProductCost=
-		sum{r in RESOURCES} costs[r]*Usage[r];
-
-	/*Declare Constraints*/
-	con Utilization {r in RESOURCES}:
-		Usage[r]<=available[r];
-
-	/*Declare Objective*/
-	max Profit = Revenue - ProductCost;
-	expand;
-	solve;
-	print units usage;
-quit;
-
-
-/*********Program 6.06**************************************/
-/*Solving MILP Problems Using OPTMODEL Procedure*/
-Data production_data;
-	input Items $ Price Labor Equipment Material Ounits rate lsp;
-	datalines;
-Sedan 26000 40 35 40 600 0.05 0.35
-SUVs 37500 50 45 60 650 0.08 0.25
-Trucks 45000 60 60 75 630 0.09 0.35
-;
-run;
-%let minimum_unit=4000;
-proc optmodel;
-	set <str> RESOURCES,VEHICLES;
-	num sales_price {VEHICLES};
-	num costs{RESOURCES},available{RESOURCES};
-	num inputs{VEHICLES,RESOURCES};
-	num lsp{VEHICLES};
-	num ounits{VEHICLES};
-	num rate{VEHICLES};
-
-	read data resource_data into RESOURCES=[Items]
-		costs available;
-
-	read data production_data into VEHICLES=[Items]
-	{r in RESOURCES} <inputs[Items,r]=col(r)> ounits
-	 rate lsp sales_price=price;
-
-	/*Declare explicit and Implicit Variables*/
-	var Units{VEHICLES}>=0 integer;
-	var Discount{VEHICLES} binary;
-		impvar Revenue=	
-		sum{p in VEHICLES}  (sales_price[p]*Units[p]);
-	impvar AdjRevenue=
-		sum{p in VEHICLES} ((Discount[p]*((1-rate[p])-0.1*lsp[p])+(1-Discount[p])*(1-lsp[p]))*ounits[p]*sales_price[p]);
-
-impvar Usage {r in RESOURCES}=
-		sum{p in VEHICLES} Units[p]*Inputs[p,r];
-	impvar ProductCost=
-		sum{r in RESOURCES} costs[r]*Usage[r];
-
-	impvar AdjProductCost=
-		sum{r in RESOURCES,p in VEHICLES} ((Discount[p]+(1-Discount[p])*(1-lsp[p]))*(ounits[p]*Inputs[p,r]*costs[r]));
-
-	/*Declare Constraints*/
-	con Utilization {r in RESOURCES}:
-		Usage[r]<=available[r];
-	
-	/*Declare Initial Objective Function*/
-	max Profit = Revenue - ProductCost;
-
-	/*Declare Additional Constraints*/
-	con Erosion{p in VEHICLES}: (1/ounits[p])*units[p]>=7;
-	con ProfitBound:AdjRevenue-AdjProductCost>=0;
-	con Minimum_Units {p in VEHICLES}: Units[p]>=&minimum_unit;
-
-	/*Declare Second Stage Objective Function*/
-	max AdjProfit= Profit+AdjRevenue - AdjProductCost;
-	expand;
-
-	solve obj AdjProfit with milp/relobjgap=0;
-	print units usage rate percent8. discount  lsp percent8.;
-print Revenue dollar12.  AdjRevenue dollar12. ProductCost dollar12. AdjProductCost dollar12.;
-quit;
-
-
-
-/*********Program 6.07**************************************/
-/*Solving Capital Budgeting with Capital Rationing problem using PROC OPTMODEL*/
-data equipment_data;
-	input equipment $ discount_rate;
-	datalines;
-A 0.1
-B 0.1
-C 0.1
-D 0.1
-E 0.1
-;
-run;
-data cashflow_data;
-	input cf $ A B C D E;
-	datalines;
-cf0 -10000 -15000 -20000 -24000 -32000
-cf1 3000 5000 5000 7000 8000
-cf2 4000 7000 7000 8500 7500
-cf3 3500 9000 10000 11000 14000
-cf4 800 8000 13000 13000 15600
-cf5 0 7500 15000 16000 23000
-;
+proc univariate data=industr noprint;
+	histogram  finance/ 
+		kernel(c = 0.5 1 2 
+		noprint  
+		k=normal)  
+		odstitle = title;
 run;
 
-%let max_budget=50000;
 
-proc optmodel;
-	set <str> PROJECT,CASHFLOW;
-	num  discount_rate{PROJECT};
-	num  cashflows{PROJECT,CASHFLOW};
-	num  year{CASHFLOW} =[0 1 2 3 4 5];
-	read data equipment_data into PROJECT=[equipment]
-		discount_rate;
-	read data cashflow_data into CASHFLOW=[cf]
-		{r in PROJECT} <cashflows[r,cf]=col(r)>;
+/*********Program 6.3**************************************
+/*Estimating Univariate Bivariate Kernel Densities Using PROC KDE*/
+title 'Distribution of Financial Services Industry and Market Returns';
+ods graphics on;
 
-	/*Declare Decision Variables*/
-	var X{r in PROJECT} binary;
-
-	/*Calculate PV of Cash flows*/
-	impvar cf{r in Project}=sum{p in CASHFLOW} (cashflows[r,p]/(1+discount_rate[r])**year[p]);
-	/*Calculate Initial Capital Outlay*/
-	impvar cost{r in PROJECT} =sum{p in CASHFLOW} (if year[p]=0 then X[r]*cashflows[r,p]);
-
-	/* declare constraints */
-	con Budget: sum{r in PROJECT} cost[r] >=-&max_budget;
-
-	/* declare objective */
-	max NPV  = sum{r in PROJECT} X[r]*cf[r];
-	expand;
-	solve;
-
-	/*Print Optimization Output*/
-	print X;
-	print Budget.lb dollar8.; 
+proc KDE data=industr;
+	univar finance(bwm=1) mrp(bwm=1) /plots=densityoverlay;
+	bivar finance mrp/ plots=all;
+run;
 
 
-/*********Program 6.08**************************************/
-/*Using PROC OPTMODEL to solve Cashflow Dedication Problem*/
-%datapull(outflows,outflows.sas7bdat);
-%datapull(bonds,bondsdata.sas7bdat);
-proc optmodel;
-	/* declare sets and parameters */
-	set <num> CASHFLOWS;
-	set <str> BONDS;
-	num year{CASHFLOWS}, liabilities{CASHFLOWS};
-	num price{BONDS},coupon{BONDS},maturity{BONDS};
-	num mature{CASHFLOWS};
+/*********Program 6.4**************************************
+/*Using PROC LOESS to Fit the Index Model*/
+ods graphics on;
 
-	/*Problem data from SAS  dataset*/
-	read data outflows into CASHFLOWS=[_N_]
-		year liabilities mature=_N_ ;
+%datapull(finscore,finscore.sas7bdat);
 
-	*print outflow dollar8. mature;
-	read data bondsdata into BONDS=[bond] 
-		price coupon maturity;
+proc loess data=industr plots=all;
+	model finance=mrp/ all details  degree=1 
+		smooth=0.1;
+	score data=finsas.finscore /clm print(var=finance);
+run;
 
-	/*Count the number of years of funding need*/
-	impvar N=card(CASHFLOWS);
 
-	/*Declare Decision Variables*/
-	var X{i in BONDS} >=0 integer, Z{j in 0..N}>=0;
+/*********Program 6.5**************************************/
+/*Estimating Index Model Using Entropy Procedure*/
+proc entropy data= industr maxiter=50 outp=entprob plots=all;
+	priors mrp  0.5(0.5) 1.5(0.5);
+	model finance = mrp /esupports= (-1.0(0.5) 1.0(0.5));
+run;
 
-	/*Setup liability funding pattern (Coupon+Principal at maturity + surplus). Coupons received every year till maturity, Principal received at maturity	*/
+proc print data=entprob;
+run;
 
-	impvar coupons {j in CASHFLOWS}=
-		sum{i in BONDS} (if maturity[i]>=mature[j] then coupon[i]*10*X[i]); /*Coupons*/
 
-	impvar Principal{j in CASHFLOWS}= 
-	sum{i in BONDS}(if maturity[i]=mature[j] then 1000*X[i]); /*Principal*/
 
-	/*Surplus cash*/
-	impvar Surplus{j in CASHFLOWS}=Z[j]-Z[j-1]; /*Surplus*/
+/*********Program 6.6**************************************/
+proc product_status;
+run;
 
-	/*Dollar Value of Bond Purchased*/
-	impvar Holdings {i in BONDS} = X[i]*price[i]*10;
 
-	/*Declare Constraints Bond Cashflows = liability funding+Surplus*/
-	con Cfcon {j in CASHFLOWS}: coupons[j]+principal[j]-surplus[j]=liabilities[j]*1000;
-	 
 
-	/*Declare Objective function*/
-	min Totalcost =Z[0]+sum{i in BONDS} price[i]*10*X[i];
-	solve with milp;
-	expand;
+/*********Program 6.7**************************************/
+/* Using PROC PROBIT to Model the Determinants of Long-term Stock Return*/
+%datapull(profit,spx_profit.sas7bdat);
+ods graphics on;
 
-	/*Print Optimization Output*/
-	print Totalcost dollar12.;
-	print X comma10. Holdings dollar12.;
-	print Z dollar12. surplus dollar12.;
+proc probit data=spx_profit plot=all;
+	class ceoduality sector;
+	model pret5(event='0') =  ceo_tenure logmcap logemp 
+		Instshrout pe esg wacc age ceoduality sector;
+	effectplot contour( x=Instshrout y=logemp);
+run;
 
-		/* write data to SAS  datasets */
-	create data Holdings from [Bond]={j in BONDS: Holdings[j]}
-		Holdings=Holdings;
-quit;
 
-	
-/*********Program 6.09**************************************/
-/*Solving QP using Interior Point Algorithm*/
-proc optmodel; var x >= 0, y >= 0;
-min Z = (x**2)+(y**2)-2*x+6*y ;
-solve with nlp obj z/algorithm=ip;
-print x x.dual y y.dual;
-con A:  3*x+8*y>=25;
-con B:  x+y <= 5;
-solve with nlp obj z/algorithm=ip;
-print x x.dual y y.dual;
-expand a;
-print A.dual A.body;
-print B.dual B.body;
-quit;
+
+/*********Program 6.8**************************************/
+/* Using PROC LOGISTIC to Model the Determinants of Long-term Stock Return*/
+ods graphics on;
+
+proc logistic  data=spx_profit plot=all;
+	class ceoduality sector;
+	model pret5(event='0') = CEO_Tenure logmcap logemp 
+		Instshrout pe esg wacc age ceoduality sector;
+	effectplot contour(x=Instshrout y=logemp);
+run;
+
+
+
+/*********Program 6.9A**************************************/
+/*Determinant of Long-Term Stock Returns*/
+%datapull(profit,spx_profit.sas7bdat);
+
+proc stepdisc data=spx_profit include=0 short;
+	class pret5;
+	var ceo_tenure logmcap logemp 
+		Instshrout pe esg wacc age;
+run;
+
+
+/*********Program 6.9B**************************************/
+/*Determinant of Long-Term Stock Returns*/
+proc discrim data=spx_profit method=normal crossvalidate 
+outstat=distat outd=discore  outcross=cvalid posterr distance anova manova pool=yes canonical ncan=2;
+	class pret5;
+	var logmcap logemp Instshrout wacc;
+	priors proportional;
+run;
+
+
+/*********Program 6.9C**************************************/
+/*Determinants of Long-Term Stock Returns*/
+proc discrim data=spx_profit method=npar kernel=normal r=.1 crossvalidate 
+	outstat=distat outd=discore outcross=cvalid posterr distance anova manova pool=yes;
+	class pret5;
+	var logmcap logemp Instshrout wacc;
+	priors  equal;
+run;
 
 
 /*********Program 6.10**************************************/
-/*Maximizing Portfolio Return in the Mean-Variance Optimization using Proc OPTMODEL*/
-%datapull(portret,portfolio_returns.sas7bdat);
-%datapull(portvcv,portfolio_covariances.sas7bdat);
-%let max_risk = 0.045;
-%let alpha=0.99;
-%let rfr=0.00178;
+/*Estimating Statistical Factor Model of Bank Stock Return*/
+%datapull(banks,banks.sas7bdat);
+ods graphics on;
 
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	num returns {ASSETS};
-	num covariance {ASSETS, ASSETS};
-
-	/* read portfolio data from SAS data sets */
-	read data Portfolio_Returns into ASSETS=[Ticker] returns;
-
-	*print returns;
-	read data Portfolio_Covariances into [Ticker]  
-		{j in ASSETS} <covariance[Ticker,j]=col(j)>;
-
-	*print covariance;
-	/* declare variables */
-	var Weights {ASSETS} >= 0;
-
-	/*Calculate Portfolio Risk Measures*/
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j]*Weights[i]*Weights[j];
-	impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-	/*Included Code: Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {j in ASSETS} 
-		-returns[j]*Weights[j]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {j in ASSETS} 
-		-returns[j]*Weights[j]+zes*sqrt(Portfolio_Variance);
-
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {j in ASSETS} 
-		returns[j] * Weights[j];
-
-	/* declare constraints */
-	con Portfolio_Weights: sum {j in ASSETS} Weights[j] = 1;
-	con Variance: Portfolio_Variance <= &max_risk**2;
-
-	/* declare objective */
-	max Portfolio_Return = Expected_Return;
-	solve ;
-
-	/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-	/*Print Optimization Outputs*/
-	print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best8.5 VaR percent8.2 Expected_Shortfall percent8.2;
-	print Variance.ub Variance.dual;
-	print {j in ASSETS: Weights[j]>1e-4} Weights percent8.2
-		{j in ASSETS: Weights[j]>1e-4} returns percent8.2;
-
-	/* write data to SAS data sets */
-	create data mvmax from [Ticker]={j in ASSETS: Weights[j]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=mvmax;
-	title1 font=swissb height=2 'Asset Allocations Using Mean-Variance Portfolio Optimization';
-	title2 font=swissb height=2 '(Return Maximization)';
-	pie  Ticker / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
+proc factor data= banks method=ml 
+	score nfact=4 priors=smc heywood  
+	rotate=quartimin plots=all  
+	outstat = factstats out=factfactors;
+	var rbac rwfc rpnc rjpm rusb rc rtfc rhban rmtb rrf rzion rfitb rcfg rkey rcma;
+	pathdiagram  fuzz=0.3 arrange=grip scale=0.85 title='Quartimin-Rotated Path Diagram' ;
 run;
-
-title1;
-title2;
-quit;
-
 
 
 /*********Program 6.11**************************************/
-/*Minimizing Portfolio Risk in the Mean-Variance Optimization using Proc OPTMODEL*/
-%let minimum_return = 0.0179;
-%let alpha=0.99;
-%let rfr=0.00178;
+/*Principal Component Analysis of Determinants of Long-Term Profitability*/
+%datapull(profit,spx_profit.sas7bdat);
+ods graphics on;
 
-
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	set <str> VIEWS;
-	num returns {ASSETS};
-	num covariance {ASSETS, ASSETS};
-
-	/* read portfolio data from SAS data sets */
-	read data Portfolio_Returns into ASSETS=[Ticker] returns;
-
-	*print returns;
-	read data Portfolio_Covariances into [Ticker]  
-		{j in ASSETS} <covariance[Ticker,j]=col(j)>;
-
-	*print covariance;
-	/* declare variables */
-	var Weights {ASSETS} >= 0;
-
-	/*Calculate Portfolio Risk Measures*/
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j] * Weights[i] * Weights[j];
-
-
-	/*Included Codes: Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+zes*sqrt(Portfolio_Variance);
-
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {j in ASSETS} 
-		returns[j] * Weights[j];
-	impvar Portfolio_Return = Expected_Return;
-
-
-	/* declare constraints */
-	con Portfolio_Weights: sum {j in ASSETS} Weights[j] = 1;
-	con Minimum_return: Expected_Return >= &minimum_return;
-
-	/* declare objective */
-	min Portfolio_Risk = sqrt(Portfolio_Variance);
-	solve ;
-	
-	/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-	/*Print Optimization Outputs*/
-	print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best4.2 VaR percent8.2 Expected_Shortfall percent8.2;
-
-	print Minimum_Return.lb Minimum_Return.dual;
-	print {j in ASSETS: Weights[j]>1e-4} Weights percent8.2
-		{j in ASSETS: Weights[j]>1e-4} returns percent8.2;
-
-	/* write data to SAS data sets */
-	create data mvmin from [Ticker]={j in ASSETS: Weights[j]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=mvmin;
-	title1 font=swissb height=2 'Asset Allocations Using Mean-Variance Portfolio Optimization';
-	title2 font=swissb height=2 '(Risk Minimization)';
-	pie  Ticker / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
+proc princomp data  = spx_profit standard
+out=pcscores(label="original data and principal components scores for work.spx_profit")
+outstat=pcstats(label="principal components statistics for work.spx_profit")
+   	prefix='comp#'n		vardef=df
+	plots(only)=scree
+	plots(only)=matrix
+	plots(only)=patternprofile
+	plots(only)=pattern ;
+	var logrev logmcap logemp logshrout age beta esg pct_wboard pe ceo_tenure logvol;
 run;
 
-title1;
-title2;
-quit;
+proc princomp data  = spx_profit standard
+out=pcscores(label="original data and principal components scores for work.spx_profit")
+outstat=pcstats(label="principal components statistics for work.spx_profit")
+   	prefix='comp#'n		vardef=df
+	plots=all;
+	var logrev logmcap logemp logshrout age beta esg pct_wboard pe ceo_tenure logvol;
+run;
+
+/*********Program 6.12A**************************************/
+/*Estimating Survival Function Credit Obligors Using PROC LIFETEST*/
+%datapull(loans,lcloans.sas7bdat);
+ods graphics on;
+
+proc lifetest data=lcloans plots=(s(atrisk),ls,lls,h(kernel=epanechnikov) cif)
+	method=pl nelson  intervals=0 to 50 by 1  outsurv=sdata;
+	time timetd*status(0)/;
+run;
 
 
-/*********Program 6.12**************************************/
-/* Use PROC IML to implement Maximum Sharpe ratio optimization*/
-%let n=63;
-proc iml;
-	/* Read asset returns and covariances into Returns and Sigma*/
-	use Portfolio_Returns;
-	read all var _num_ into returns[colname=NumerNames];
-	read all var _char_ into assets[colname=CharNames];
+/*********Program 6.12B**************************************/
+/*Comparing Survival Function Credit Obligors Using PROC LIFETEST*/
+ods graphics on;
 
-	use Portfolio_Covariances;
-	read all var _num_ into sigma[colname=NumerNames rowname=Ticker];
+proc lifetest data=lcloans method=pl  plots=(s h ls lls) notable outtest=sest intervals=0 to 50 by 1  outsurv=sdata;;
+	time timetd*status(0);
+	strata term/order=internal test=(lr logrank);
+	test dti int_rate;
+run;
 
-	rfr=0.00178;/*Monthly Risk-free rate*/
 
-	start max_sharpe(w) global(rfr,sigma,returns,portfolio_return, portfolio_risk, sharpe);
-		portfolio_return=W*returns;
-		portfolio_risk=sqrt(w*sigma*t(w));
-		sharpe=(portfolio_return-rfr)/portfolio_risk;
-		return (sharpe);
-	finish;
+/*********Program 6.13**************************************/
+/*Estimating Proportional Hazard Models of Credit Obligors Using PROC PHREG*/
+ods graphics on;
 
-	/*Constraint: lower bound, upper bound, sum weights equals 1)*/
-	p={0,1,1};
-	con=repeat(p,1,&n)||{. .,. .,0 1};;
-
-	/* Setting the optimization to maximize the objective function and print optimization summary*/
-	optn={1 1};
-		/*Invoke non-linear Quasi Newton for linearly constrained problem. Set initial value set to equal Weights*/
-w=j(1,&n,1/&n);
-	call NLPQN(rc,OptW,"max_sharpe",w,optn,con);
-
-/* Print Optimization Output*/
-	print portfolio_return[format=percent8.2] portfolio_risk[format=percent8.2] sharpe[format=best4.2] ;
-
-	TOptW=t(OptW);
-	ind = loc(TOptw>0);
-
-	if ncol(ind)>0 then
-		rn=NumerNames[ind];
-		Weights=TOptW[ind];
-	print Weights[format=percent8.2 l='Portfolio Allocations' colname='Ticker' rowname=rn ];
-	cnames='Ticker'||'Weights';
-	create Sharpemax from rn Weights[colname=cnames];
-	append from rn Weights;
-	close sharpemax;
-
-proc sgpie data=sharpemax;
-title1 font=swissb height=2 'Asset Allocations from Mean Variance Portfolio Optimization';
-title2 font=swissb height=2 '(Sharpe Ratio  Maximization)';
-	pie  ticker / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
+proc phreg data=lcloans plots=(survival cumhaz roc auc) 
+	rocoptions(at=0 to 40 by 10) simple;
+	class application_type grade term purpose home_ownership verification_status emp_length;
+	model timetd*status(0)= loan_amnt int_rate annual_inc dti pub_rec application_type total_acc revol_util grade term purpose home_ownership
+		verification_status emp_length / selection=stepwise slentry=0.25 slstay=0.15 details;
 run;
 
 
 
-/*********Program 6.13A**************************************/
-/*Creating Efficient Frontier and Capital Allocation Line in SAS*/
-%let rfr=0.00178; /*Risk-free rate*/
-%let Max_Sharpe=0.36; /*Sharpe ratio*/
-%let m =100;/*Number of portfolio to optimized and simulate*/
-%let r =63;/*Number of current stocks in portfolio*/
+/*********Program 6.14**************************************/
+/*Using PROC Syslin to Model the Determinant of Stock return and Volume*/
+%datapull (market,market_data.sas7bdat);
+ods graphics on;
 
-%macro EFsim(nrep); /*spccify number of reps*/
-	proc datasets nodetails nolist;
-		delete simfrontier;	run;
-
-	%local i nrep; /*local macro variable*/
-	%do i=1 %to &nrep;
-
-		proc optmodel printlevel=1;
-			/* declare sets and parameters */
-			set <str> ASSETS;
-			num returns {ASSETS};
-			num covariance {ASSETS, ASSETS};
-		/* read portfolio data from SAS  datasets */
-read data Portfolio_Returns into ASSETS=[Ticker] returns;
-			read data Portfolio_Covariances into [Ticker]  
-			{j in ASSETS} <covariance[Ticker,j]=col(j)>;
-
-			/* declare variables */
-			var Weights {ASSETS} >= 0;
-			impvar max_risk=&i*.001+.033;
-
-			/*Calculate Portfolio Risk Measures*/
-impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j]*Weights[i]*Weights[j];
-			impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-						/*Calculate portfolio return*/
-			impvar Expected_Return=sum {j in ASSETS} 
-				returns[j] * Weights[j];
-
-			/* declare constraints */
-			con Portfolio_Weights:sum{j in ASSETS}Weights[j]=1;
-			con Variance: Portfolio_Variance = max_risk**2;
-
-			/* declare objective */
-			max Portfolio_Return = Expected_Return;
-			solve;
-
-			/*Portfolio Sharpe Ratio*/
-Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-			/*Print Optimization Outputs*/
-print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best4.2;
-print {j in ASSETS: Weights[j]>1e-4} Weights percent8.2	{j in ASSETS: Weights[j]>1e-4} returns percent8.2;
-
-			/* write data to SAS  datasets */
-create data smvmax from index=&i Returns=Portfolio_return Risks=Portfolio_Risk Sharpe=Sharpe_Ratio;
-			quit;
-
-		/*updated table with results from new iteration*/
-		proc append base=simfrontier data=smvmax force;
-		run;
-
-	%end;
-%mend;
-%efsim(&m);
-	
-	/*********Program 6.13B**************************************/
-/*Simulating random portfolio weights using PROC IML*/
-proc iml;
-	use Portfolio_Returns;
-	read all var _num_ into returns[colname=NumerNames];
-	read all var _char_ into assets[colname=CharNames];
-	use Portfolio_Covariances;
-	read all var _num_ into sigma[colname=NumerNames rowname=Ticker];
-
-	/*Simulate portfolio weights*/
-	x=j(&m,&r);
-	call randseed(12348);
-	call randgen(x,'exp');
-	W=x/x[,+];
-
-	/*Create column names*/
-	pnames ='Index'||'RReturns'||'RRisks';
-
-	/*Create vector and calculate portfolio risk and returns*/	
-	portplot=j(&m,3);
-	do i = 1 to &m;
-		portplot[i,1]=i;
-		portplot[i,2]=w[i,]*returns;
-		portplot[i,3]=sqrt((w[i,])*(sigma*t(w[i,])));
-	end;
-
-	create Portplot from Portplot [colname=pnames];
-	append from Portplot;
-	close Portplot;
-
-
-/*********Program 6.13C**************************************/
-/*Creating Efficient frontier and capital allocation line using PROC SGPLOT*/
-data EFrontier;
-	merge Simfrontier Portplot;
-	by index;
-	if index=100 then do;
-	Creturns=0.0109523; CRiskS =0.0474768;
-	end;
+proc syslin data=market_data 2sls out=predicted;
+	endogenous dret vret;
+	instruments rbond roil rexr rvix rgvix rovix ldret lvret;
+return:
+	model dret= vret lvret rbond roil rexr;
+	output predicted=pdret ;
+volume:
+	model vret= dret ldret rvix rgvix rovix;
+	output predicted=pvret;
 run;
 
-proc sgplot data=Efrontier;
-	title "Optimal Portfolio Allocations With Six-Three Assets Portfolio";
-	lineparm x=0 y=&rfr slope=&max_sharpe /lineattrs=graphdata6(thickness=4)   legendlabel='Capital Allocation Line';
-	series x=Risks Y=Returns/ legendlabel='Efficient Frontier' lineattrs=graphdata1(thickness=3 color=bippk );
-scatter x=RRisks Y=RReturns/legendlabel='Unoptimized Random Portfolios' markerattrs=(color=bipb symbol=circlefilled size=3 pt);
-scatter x=CRisks Y=CReturns/legendlabel='Initial Portfolio' markerattrs=(color=viypk symbol=starfilled size=6 pt);
+proc sgplot data=predicted;
+series x=Date y=pdret/y2axis;
+series x=Date y=dret;
+xaxis label= 'Daily Returns' values=('01jan2009'D to '20dec2022'd) interval=year valuesformat=YY.;
+run;
 
-	inset "Risk Free Rate = 1.78%" "Maximum Sharpe Ratio =0.36" /  border title="Portfolio Statistics" position=topleft;;
-	xaxis label='Portfolio Standard Deviation' valuesformat=percent8.2 values=(0 to 0.11 by 0.02);
-	yaxis label='Portfolio Returns' valuesformat=percent8.2 values=(0 to 0.04 by 0.005);
+
+/*********Program 6.15**************************************/
+/*Modeling the Relationship between Unemployment and Consumption*/
+%datapull (conswork,conswork.sas7bdat);
+ods graphics on;
+
+proc varmax data=conswork plots=all;
+	id date interval=month;
+	model  pce unrate = / p=1 method=ml print=(impulse(12) decompose(12));
+	causal group1=(pce) group2=(unrate);
+	causal group1=(unrate)  group2=(pce);
+	output lead= 12 out=forecast;
+run;
+
+
+/*********Program 6.16**************************************/
+/*Forecasting Monthly Trading Volume on the S&P 500 using Exponsential Smoothing Model*/
+%datapull(spx,rspx_monthly.sas7bdat);
+ods graphics on;
+
+proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
+outest=sesmparms outstat=sesmstats print=all;
+	id date interval=monthly;
+	forecast volume /model=simple;
+run;
+
+proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
+outest=desmparms outstat=desmstats print=all;
+	id date interval=monthly;
+	forecast volume /model=linear;
+run;
+
+proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
+outest=tesmparms outstat=tesmstats print=all;
+	id date interval=monthly;
+	forecast volume /model=multwinters;
+run;
+title 'Forecasting S&P 500 Volume Using Simple ESM';
+proc sgrender data=sesmparms template=ETS.ESM.ParameterEstimates;
+run;
+title 'Forecasting S&P 500 Volume Using Holts Double ESM';
+proc print data=desmparms;
+run;
+title 'Forecasting S&P 500 Volume Using Additive Holt-Winters Triple ESM';
+proc print data=tesmparms;
 run;
 title;
 
 
-/*********Program 6.14A**************************************/
-/* Using PROC IML to obtain Blended Expected Returns and Covariances */
-
-%datapull(pmatrix,pmatrix.sas7bdat);
-%datapull(omega,omega.sas7bdat);
-%datapull(qret,qret.sas7bdat);
-%let rfr=0.00178;/*Risk-Free Rate*/
-%let alpha=0.99;/*VaR Threshold*/
-%let tau=0.05;/*Weight of active risk*/
-%let max_risk = 0.045;
-
-/* Use PROC IML to set reverse optimization obtain Revised Expected Returns and Covariances Forecast*/
-proc iml;
-	/*read subjective views (asset and returns) into vectors*/
-	use PMatrix; /*asset with subjective views*/
-	read  all var _NUM_ into p [colname=NumerNames rowname=Views];
-	use qret; /*subjective performances*/
-	read all var _all_ into q[colname=NumerNames rowname=Views];
-	use omega; /*Confidence level of views*/
-	read all var _all_ into omega[colname=NumerNames rowname=Views];
-
-	*print p q;
-	/* Read equilibrium returns and covariances into EQRET and SIGMA*/
-	use Portfolio_Returns;
-	read all var _num_ into eqret[colname=NumerNames rowname=Ticker];
-	read all var _char_ into assets[colname=CharNames];/*Asset names*/
-
-	*print eqret;
-	use Portfolio_Covariances;
-	read all var _num_ into sigma[colname=NumerNames rowname=Ticker];
-
-	*print sigma;
-	/*Compute revised expected returns and covariances*/
-	RReturns=inv(inv(&tau*sigma)+t(p)*(inv(omega))*p)*(inv(&tau*sigma)*eqret+t(p)*(inv(omega))*q);
-	RCovariances=sigma+inv(inv(&tau*sigma)+t(p)*(inv(omega))*p);
-	*print RReturns[colname='Returns'];
-
-	*print RCovariances[colname=Name rowname=Name];
-	/*Export revised expected returns into SAS data sets*/
-	Anames ='Ticker'||'Returns'||'EQReturns'; /*Variable names setup*/
-	create Revised_Portfolio_Returns from Assets rreturns Eqret[colname=Anames];
-	append from Assets RReturns Eqret;
-	close Revised_Portfolio_Returns;
-
-	/*Export revised covariance into SAS data sets*/
-	sname ={'Assets'};/*Variable names setup*/
-	cnames ='Ticker'||Numernames;
-
-	*print cnames;
-	create Revised_Porfolio_Covariances from Assets RCovariances[colname= cnames ];
-	append from Assets RCovariances;
-	close Revised_Porfolio_Covariances;
+title 'Fit Statistic from Forecasting S&P 500 Volume Using ESM';
+proc print data=sesmstats;
+proc print data=desmstats;
+proc print data=tesmstats;
+run;
+title;
 
 
+/*********Program 6.17**************************************/
+/*Generating Monthly Forecast of the Wilshire 5000 Index Returns Using UCM*/
+%datapull (conswork,conswork.sas7bdat);
+ods graphics on;
 
-/*********Program 6.14B**************************************/
-	/*Black-Litterman Portfolio optimization using PROC OPTMODEL*/
-	/*Portfolio optimization*/
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	num Returns {ASSETS};
-	num EQReturns {ASSETS};
-	num covariance {ASSETS, ASSETS};
-
-	/* read revised portfolio data from SAS data sets */
-	read data Revised_Portfolio_Returns into ASSETS=[Ticker] returns=returns eqreturns;
-
-	*print returns;
-	read data Revised_Porfolio_Covariances into [Ticker]  
-		{j in ASSETS} <covariance[Ticker,j]=col(j)>;
-
-	*print covariance;
-	/* declare variables */
-	var Weights {ASSETS} >= 0;
-
-	/*Calculate Portfolio Risk Measures*/
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j] * Weights[i] * Weights[j];
-	impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-	/*included Codes Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+zes*sqrt(Portfolio_Variance);
-
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {j in ASSETS} 
-		returns[j] * Weights[j];
-
-	/* declare constraints */
-	con Portfolio_Weights: sum {j in ASSETS} Weights[j] = 1;
-	con Variance: Portfolio_Variance <= &max_risk**2;
-
-	/* declare objective */
-	max Portfolio_Return = Expected_Return;
-	solve;
-
-	/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-	/*Print Optimization Outputs*/
-	print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best4.2 VaR percent8.2 Expected_Shortfall percent8.2;
-	print Variance.ub Variance.dual;
-	print {j in ASSETS: Weights[j]>1e-4} Weights percent8.2
-		{j in ASSETS: Weights[j]>1e-4} Returns percent8.2
-		{j in ASSETS: Weights[j]>1e-4} EQReturns percent8.2;
-
-	/* write data to SAS data sets */
-	create data blmax from [Name]={j in ASSETS: Weights[j]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=blmax;
-	title1 font=swissb height=2 'Asset Allocations from Black-Litterman Portfolio Optimization';
-	title2 font=swissb height=2 '(Return Maximization)';
-	pie  Name / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
+proc ucm data=conswork;
+	id date interval=monthly;
+	model will5000 = t10yr unrate pce jby;
+	irregular;
+	level;
+	cycle;
+	season type=dummy length=12;
+	estimate  outest=ucmparms;
+	forecast back=24 lead=36 plot=(decomp decompvar forecasts );
+	nloptions tech=dbldog maxiter=200;
 run;
 
-title1;
-title2;
-quit;
-
-
-/*********Program 6.15**************************************/
-%let rfr=0.00178; /*Risk-Free Rate*/
-%let alpha=0.99; /*VaR Threshold*/
-%let minimum_return = 0.01787;/*Minimum Portfolio Return*/
-%let maximum_risk=0.045; /*Maximum Standard Deviation*/
-
-
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	num returns {ASSETS};
-	num covariance {ASSETS, ASSETS};
-
-	/* read portfolio data from SAS data sets */
-	read data Portfolio_Returns into ASSETS=[Ticker] returns;
-	read data Portfolio_Covariances into [Ticker]  
-		{j in ASSETS} <covariance[Ticker,j]=col(j)>;
-
-	/* Declare decision variables */
-	var Weights {ASSETS}>=0;
-
-	/*Count the number of securities in portfolio*/
-	impvar N=card(ASSETS);
-
-	*print N;
-	/*Calculate Portfolio Risk Measures*/
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j] * Weights[i] * Weights[j];
-	impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-	/*Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+zes*sqrt(Portfolio_Variance);
-
-	/*Calculate risk budget, currently equal risk contribution*/
-	impvar rb{j in ASSETS}=1/N;
-
-	*print rb;
-	/*Calculate relative risk contribution rrc*/
-	impvar rrc{i in ASSETS} = ((sum{j in ASSETS} 
-		covariance[i,j] *Weights[j])* Weights[i])/(Portfolio_Variance);
-
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {j in ASSETS} 
-		returns[j] * Weights[j];
-	impvar Portfolio_Return = Expected_Return;
-
-		/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-	/* declare constraints */
-	con Portfolio_Weights: sum {j in ASSETS} Weights[j] = 1;
-	*con Sharpe: Sharpe_Ratio>=0.355;
-	con Minimum_return: Portfolio_Return >= &minimum_return;
-	con Maximum_Risk: Portfolio_Risk<=&maximum_risk;
-
-	/* declare objective */
-	min RiskDeviation =sum{i in Assets} (rrc[i] - rb[i])**2;
-	solve;
-
-	/*Print Optimization Outputs*/
-	print rrc percent8.2 rb percent8.2;
-	print  Portfolio_Return percent8.3 Portfolio_Risk percent8.2  Sharpe_Ratio best4.2 VaR percent8.2 Expected_Shortfall percent8.2;
-
-	*print Minimum_return.ub Minimum_return.dual;
-	print {j in ASSETS: Weights[j]>1e-4} Weights percent8.2
-		{j in ASSETS: Weights[j]>1e-4} returns percent8.2;
-
-	/* write data to SAS data sets */
-	create data rpmin from [Ticker]={j in ASSETS: Weights[j]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=rpmin;
-	title1 font=swissb height=2 'Asset Allocations from Risk Parity Portfolio Optimization';
-	title2 font=swissb height=2 'Minimum Risk Deviation';
-	pie  Ticker / response=Weights otherpercent=1.5   statfmt=percent8.2   datalabelloc=callout;
+proc print data=ucmparms;
 run;
-
-title1;
-title2;
-quit;
-
-
-/*********Program 6.16A**************************************/
-/* Use PROC IML to Simulate 1,000 Portfolio Scenarios*/
-%let j =1000;
-proc iml;
-	/* Read returns and covariances into EQRET and SIGMA*/
-	use Portfolio_Returns;
-	read all var _num_ into returns [colname=NumerNames];
-	read all var _char_ into assets[colname=CharNames];
-
-	use Portfolio_Covariances;
-read all var _num_ into sigma[colname=NumerNames rowname=Ticker];
-
-	call randseed (7564321); 	/*Random Seed*/
-
-	%let r =nrow(eqret);
-	SRet =RandNormal(&j,returns,sigma);/*Simulate 1000x N-Assets*/
-	SMean =mean(SRet); /*calculate sample mean*/
-	SCOV = cov(SRet); /*calculate sample covariance*/
-
-	/*Index of Scenarios*/
-	SNum = t("SC1":"SC&j");
-
-	/*Export revised expected returns into SAS  datasets*/
-	Anames ='Scenario'||NumerNames; /*Variable names setup*/
-	create Simulated_Returns from SNum SRet [colname=Anames];
-	append from SNum SRet;
-	close Simulated_Returns;
-
-
-/*********Program 6.16B**************************************/
-/*Implementing Conditional Value-at-Risk Optimization using PROC OPTMODEL*/
-%let alpha=0.95;
-%let rfr=0.00178;
-%let minimum_return = 0.0179;
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	set <str> SCENARIOS;
-	num returns{ASSETS};
-	num sreturns {ASSETS,SCENARIOS};
-	num covariance {ASSETS, ASSETS};
-
-	/* read portfolio data from SAS data sets */
-	read data Portfolio_Returns into ASSETS=[Ticker] returns;
-	read data simulated_Returns into SCENARIOS=[Scenario] 
-		{i in ASSETS} <sreturns[i,Scenario]=col(i)>;
-
-	*print sreturns;
-	* print return;
-	read data Portfolio_Covariances into [Ticker]  
-		{i in ASSETS} <covariance[Ticker,i]=col(i)>;
-
-	* print covariance;
-	/* declare decision variables */
-	var Weights {ASSETS} >= 0;
-	Var Opt_VaR>=0;
-	Var Z{SCENARIOS}>=0;
-
-	/*Calculate Portfolio Risk Measures*/
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j] * Weights[i] * Weights[j];
-	impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-	/*Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {i in ASSETS} 
-		-returns[i] * Weights[i]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {i in ASSETS} 
-		-returns[i] * Weights[i]+zes*sqrt(Portfolio_Variance);
-
-	/*Functions of Scenario Portfolios and Optimized VaR*/
-	impvar FWVaR{s in SCENARIOS}=sum{i in ASSETS}(-Weights[i]*sreturns[i,s])-Opt_VaR;
-	*impvar FXV =Opt_VaR+1/(&j*(1-&alpha))*(sum{s in SCENARIOS} Z[s]);
-
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {i in ASSETS} 
-		returns[i] * Weights[i];
-	impvar Portfolio_Return = Expected_Return;
-
-	/* declare constraints */
-	con CZ{s in SCENARIOS} : Z[s]+sum {i in ASSETS} Weights[i]*sreturns[i,s]+Opt_VaR>=0;
-	con SZ{s in SCENARIOS} : Z[s]>=0;
-	con Minimum_Return: Expected_Return>=&minimum_return;
-	con Portfolio_Weights: sum {i in ASSETS} Weights[i] = 1;
-
-	*con Minimum_return: Expected_Return >= &minimum_return;
-	/* declare objective */
-	min CVAR =Opt_VaR+1/(&j*(1-&alpha))*(sum{s in SCENARIOS} Z[s]);
-	solve;
-
-	/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-	/*Print Optimization Outputs*/
-	print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best4.2 CVAR percent8.2 Opt_VaR percent8.2 VaR percent8.2  Expected_Shortfall percent8.2;
-	print {i in ASSETS: Weights[i]>1e-4} Weights percent8.2
-	{i in ASSETS: Weights[i]>1e-4} returns percent8.2;
-
-	/* write data to SAS data sets */
-	create data cvarmin from [Ticker]={i in ASSETS: Weights[i]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=cvarmin;
-	title1 font=swissb height=2 'Asset Allocations Using Mean-CVAR Portfolio Optimization';
-	title2 font=swissb height=2 '(CVaR Minimization)';
-	pie  Ticker / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
-run;
-
-title1;
-title2;
-quit;
-
-
-/*********Program 6.01**************************************/
-/*Robust Portfolio Optimization using Scenario Uncertainty Set*/
-/* Use PROC IML to Simulate 1,000 Portfolio Scenarios*/
-%let j =1000;
-%let alpha=0.99;
-
-proc iml;
-	/* Read returns and covariances into RETURNS and SIGMA*/
-	use Portfolio_Returns;
-	read all var _num_ into returns[colname=NumerNames];
-	read all var _char_ into assets[colname=CharNames];/*Asset names*/
-
-	*print returns;
-	use Portfolio_Covariances;
-	read all var _num_ into sigma[colname=NumerNames rowname=Ticker];
-	call randseed (7564321);
-
-	%let r =nrow(returns);
-	SRet =RandNormal(&j,returns,sigma); /*Simulate 1000x2 vector*/
-	SMean =mean(SRet); /*calculate sample mean*/
-	SCOV = cov(SRet); /*calculate sample covariance*/
-
-	/*Index of Scenarios*/
-	SNum = t("SC1":"SC&j");
-
-	*print SNUM SRET;
-	/*Export revised expected returns into SAS data sets*/
-	Anames ='Scenario'||NumerNames; /*Variable names setup*/
-	create Simulated_Returns from SNum SRet [colname=Anames];
-	append from SNum SRet;
-	close Simulated_Returns;
-
-
-
-/*Estimating Robust Portfolio Optimization using Scenario Uncertainty Set*/
-%let rfr=0.00178;
-%let minimum_return = 0.0179;
-%let max_risk = 0.045;
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	set <str> SCENARIOS;
-	num returns{ASSETS};
-	num sreturns {ASSETS,SCENARIOS};
-	num covariance {ASSETS, ASSETS};
-
-	/* read portfolio data from SAS data sets */
-	read data Portfolio_Returns into ASSETS=[Ticker] returns;
-	read data simulated_Returns into SCENARIOS=[Scenario] 
-		{i in ASSETS} <sreturns[i,Scenario]=col(i)>;
-
-	*print sreturns;
-	* print return;
-	read data Portfolio_Covariances into [Ticker]  
-		{i in ASSETS} <covariance[Ticker,i]=col(i)>;
-
-
-	/* declare decision variables */
-	var Weights {ASSETS}>=0;
-	Var T;
-
-	/*Calculate Portfolio Risk Measures*/
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j] * Weights[i] * Weights[j];
-	impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-	/*Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {i in ASSETS} 
-		-returns[i] * Weights[i]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {i in ASSETS} 
-		-returns[i] * Weights[i]+zes*sqrt(Portfolio_Variance);
-
-	/*Functions of Scenario Portfolios*/
-	impvar FSRet{s in SCENARIOS}=sum{i in ASSETS}(Weights[i]*sreturns[i,s]);
-
-	*impvar SSharpe{s in SCENARIOS}=(FSRet[s]-&rfr)/portfolio_risk;
-	
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {i in ASSETS} 
-		returns[i] * Weights[i];
-	impvar Portfolio_Return = Expected_Return;
-
-	/* declare constraints */
-	con CT{s in SCENARIOS} : T-FSRet[s]<=0;
-	con Maximum_Risk: Portfolio_Risk<=&max_risk;
-	con Portfolio_Weights: sum {i in ASSETS} Weights[i] = 1;
-
-	/* declare objective */
-	max Z=T;
-	solve;
-	*print Fsret percent8.2;
-	/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-	/*Print Optimization Outputs*/
-	print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best4.2   VaR percent8.2  Expected_Shortfall percent8.2;
-	print {i in ASSETS: Weights[i]>1e-4} Weights percent8.2
-	{i in ASSETS: Weights[i]>1e-4} returns percent8.2;
-
-	/* write data to SAS data sets */
-	create data robustscemax from [Ticker]={i in ASSETS: Weights[i]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=robustscemax;
-	title1 font=swissb height=2 'Asset Allocations Using Robust Portfolio Optimization';
-	title2 font=swissb height=2 '(Return Maximization with Scenario Uncertainty)';
-	pie  Ticker / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
-run;
-
-title1;
-title2;
-quit;
-
-
-/*********Program 6.18A**************************************/
-/* Use PROC IML to Simulate 1,000 Portfolio Scenarios and calculate covariance errors matrix*/
-%let n =1000;
-proc iml;
-	use Portfolio_Returns;
-	read all var _num_ into returns[colname=NumerNames rowname=Ticker];
-	read all var _char_ into assets[colname=CharNames];/*Asset names*/
-
-	use Portfolio_Covariances;
-	read all var _num_ into sigma[colname=NumerNames rowname=Ticker];
-
-	call randseed (7564321);
-
-	SRet =RandNormal(&n,returns,sigma); /*Simulate 1000x2 vector*/
-	SMReturns=t(mean(SRet)); /*calculate sample mean*/
-	SSigma = cov(SRet); /*calculate sample covariance*/
-		
-	/*Compute Cholesky decompositions*/
-	SigmaD=root((SSigma));
-
-	/*Export covariance of error into SAS data sets*/
-	sname ={'Assets'};/*Variable names setup*/
-	cnames ='Ticker'||Numernames;
-
-	create Portfolio_SigmaD from Assets SigmaD[colname= cnames ];
-	append from Assets SigmaD;
-	close Portfolio_SigmaD;
-
-
-/*********Program 6.01**************************************/
-/* Implementing Robust Portfolio Optimization using Ellipsoidal Uncertainty Set in PROC OPTMODEL*/
-%let rfr=0.00178;
-%let alpha=0.99;
-%let minimum_return = 0.0179;
-%let max_risk = 0.045;
-%let rho=0.2;
-
-/*Portfolio optimization*/
-proc optmodel;
-	/* declare sets and parameters */
-	set <str> ASSETS;
-	num returns{ASSETS};
-	num sigmaD{ASSETS,ASSETS};
-	num covariance{ASSETS, ASSETS};
-
-	/* read revised portfolio data from SAS data sets */
-	read data Portfolio_Returns into ASSETS=[Ticker] returns=returns;
-
-	read data Portfolio_Covariances into [Ticker]  
-		{j in ASSETS} <covariance[Ticker,j]=col(j)>;
-
-	*print returns;
-	read data Portfolio_SigmaD into [Ticker]  
-		{j in ASSETS} <sigmaD[Ticker,j]=col(j)>;
-	*print covariance;
-
-	/* declare variables */
-	var Weights {ASSETS} >= 0;
-
-
-	/*Calculate Portfolio Risk Measures*/
-	impvar Robust_Sigma =sum{i in ASSETS, j in ASSETS} (Weights[i]*sigmaD[i,j]*Weights[j]);
-
-	impvar Portfolio_Variance=sum {i in ASSETS, j in ASSETS}covariance[i,j] * Weights[i] * Weights[j];
-	impvar Portfolio_Risk = sqrt(Portfolio_Variance);
-
-	/*Included Codes: Value at Risk and Expected Shortfall*/
-	impvar zes =(((2*constant("pi"))**(0.5))*(exp(((2**-0.5)*quantile('normal',&alpha))**2))*(1-&alpha))**-1;
-	impvar VaR=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+quantile("normal",&alpha)*sqrt(Portfolio_Variance);
-	impvar Expected_Shortfall=sum {j in ASSETS} 
-		-returns[j] * Weights[j]+zes*sqrt(Portfolio_Variance);
-
-
-	/*Calculate portfolio return*/
-	impvar Expected_Return=sum {j in ASSETS} 
-		returns[j] * Weights[j];
-	impvar Portfolio_Return = Expected_Return;
-
-	/* declare constraints */
-	con Portfolio_Weights: sum {j in ASSETS} Weights[j] = 1;
-	con Maximum_Risk: Portfolio_Risk<=&max_risk;
-
-	/* declare objective */
-	max WRet=(Expected_Return-&rho*robust_sigma**0.5);
-	solve ;
-
-	/*Portfolio Sharpe Ratio*/
-	Impvar Sharpe_Ratio = (Expected_Return-&rfr)/Portfolio_Risk;
-
-		/*Print Optimization Outputs*/
-	print  Portfolio_Return percent8.2 Portfolio_Risk percent8.2 Sharpe_Ratio best5.2 VaR percent8.2 Expected_Shortfall percent8.2;
-	print robust_sigma;
-*	print Minimum_return.lb percent8.2 Minimum_return.dual percent8.2;
-	print {j in ASSETS: Weights[j]>1e-4} Weights percent8.2
-		{j in ASSETS: Weights[j]>1e-4} returns percent8.2;
-
-	/* write data to SAS data sets */
-	create data robustemax from [Name]={j in ASSETS: Weights[j]>1e-4}
-		Weights=Weights;
-quit;
-
-proc sgpie data=robustemax;
-	title1 font=swissb height=2 'Asset Allocations from Robust Portfolio Optimization';
-	title2 font=swissb height=2 '(Return Maximization with Ellipsoid Uncertainty)';
-	pie  Name / response=Weights otherpercent=1  statfmt=percent8.2   datalabelloc=callout;
-run;
-title1;
-title2;
-quit;
-
-
