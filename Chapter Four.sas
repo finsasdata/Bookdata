@@ -1,893 +1,743 @@
-﻿
-/*********Program 4.01**************************************
-/*SAS Codes to show different parametric method of estimation*/
-%datapull(industr,industr.sas7bdat);
-proc model data=industr;
-finance = constant +beta*mrp;
-fit finance / ols; /*OLS*/
-fit finance / fiml; /*MLE*/
-fit finance / gmm;/*GMM*/
+﻿/******************Program 4.1****************/
+/*Simulating Data from Bernoulli Distribution */
+data simul1;
+	call streaminit(4321);/*Random seed generator*/
+	prob =0.5; /*Probability of Success*/
+
+	do i=1 to 100; /*Number of Iteration*/
+		Simnum =rand("Bernoulli", prob); /*Invoking the RAND function*/
+		output; /*To the values from each iteration*/
+	end;
 run;
 
-
-/*********Program 4.02**************************************
-/*Estimating Kernel Density Using PROC UNIVARIATE*/
-title 'Distribution of Financial Services Industry Returns';
-proc univariate data=industr noprint;
-	histogram  finance/ 
-		kernel(c = 0.5 1 2 
-		noprint  
-		k=normal)
-		odstitle = title;
-run;
-
-
-
-/*********Program 4.03**************************************
-/*Estimating Univariate Bivariate Kernel Densities Using PROC KDE*/
-title 'Distribution of Financial Services Industry and Market Returns';
-ods graphics on;
-proc KDE data=industr;
-	univar finance(bwm=1) mrp(bwm=1) /plots=densityoverlay;
-	bivar finance mrp/ plots=all;
-run;
-
-
-/*********Program 4.04**************************************
-/*Using PROC LOESS to Fit the Index Model*/
-proc loess data=industr plots=all;
-	model finance=mrp/ clm details  degree=1 
-		dfmethod=exact smooth=0.1;
-	score data=finscore /clm print(var=finance);
-run;
-
-
-
-/*********Program 4.05**************************************/
-/*Estimating Index Model Using Entropy Procedure*/
-proc entropy data= industr maxiter=50 outp=entprop plots=all;
-	priors mrp  0.5(0.5) 1.5(0.5);
-	model finan = mrp /esupports= (-1.0(0.5) 1.0(0.5));
-run;
-
-proc print data=entprop;
-run;
-
-
-
-/*********Program 4.06**************************************/
-proc product_status;
-run;
-
-
-
-/*********Program 4.07**************************************/
-/* Using PROC PROBIT to Model the Determinants of Long-term Stock Return*/
-%datapull(profit,spx_profit.sas7bdat);
+/*Computing Simulation Statistics*/
 ods graphics on;
 
-proc probit data=spx_profit plot=all;
-	class ceoduality sector;
-	model pret5(event='0') =  ceo_tenure logmcap logemp 
-		Instshrout pe esg wacc age ceoduality sector;
-	effectplot contour( x=Instshrout y=logemp);
+proc freq  data=simul1;
+	table Simnum/
+		plots = freqplots;
 run;
 
 
+/******************Program 4.2****************/
+/*Simulating Data from Binomial Distribution */
+data simul2;
+	call streaminit(4321);/*Random seed generator*/
+	prob =0.5; /*Probability of Success*/
+	num = 1;
 
-/*********Program 4.08**************************************/
-/* Using PROC LOGISTIC to Model the Determinants of Long-term Stock Return*/
+	do i=1 to 100; /*Number of Iteration*/
+		Simnum =rand("Binonmial", prob,num); /*Invoking the RAND function*/
+		output; /*To the values from each iteration*/
+	end;
+run;
+
+/*Computing Simulation Statistics*/
 ods graphics on;
 
-proc logistic  data=spx_profit plot=all;
-	class ceoduality sector;
-	model pret5(event='0') = CEO_Tenure logmcap logemp 
-		Instshrout pe esg wacc age ceoduality sector;
-	effectplot contour(x=Instshrout y=logemp);
+proc freq  data=simul2;
+	table Simnum/
+		plots = freqplots;
+run;
+
+/******************Program 4.3****************/
+/*Simulating Data from the Normal Distribution */
+data simul3;
+	call streaminit(4321);/*Random seed generator*/
+
+	do i=1 to 100; /*Number of Iteration*/
+		Simnum =rand("normal"); /*Invoking the RAND function*/
+		output; /*To the values from each iteration*/
+	end;
+run;
+
+/*Computing Simulation Statistics*/
+proc univariate  data=simul3;
+	Var  Simnum;
+	histogram;
+run;
+
+/******************Program 4.4****************/
+/*Simulating S&P 500 Returns Using the Normal Distribution */
+/*Specify distribution statistics*/
+%let smean=0.0067658;
+%let ssd = 0.04465726;
+
+data simul4 (keep=i simnum);
+	call streaminit(4321);/*Random seed generator*/
+	do i=1 to 1000; /*Number of Iteration*/
+		Simnum =rand("normal",&smean,&ssd); /*Invoking the RAND function*/
+		output; /*To the values from each iteration*/
+	end;
+run;
+
+/*Computing Simulation Statistics*/
+proc univariate  data=simul4;
+	Var  Simnum;
+	histogram / normal kernel;
+run;
+
+/******************Program 4.5****************/
+/*Simulating Stock Returns Using the Multivariate Normal Distribution */
+%let n=1000; /*number of repetitions or sample size*/
+
+proc iml;
+	mean = {0.0215,-0.0038}; /*Mean Vector*/
+	vcv ={0.0122 0.000452,
+		0.000452 0.00258}; /*Covariance Matrix*/
+	call randseed (4321);
+	MRET =RandNormal(&n,mean,vcv); /*Simulate 1000x2 vector*/
+	smean =mean(MRET); /*calculate sample mean*/
+	svcv = cov(MRET); /*calculate sample covariance*/
+	vname ={"AMZN","WMT"}; /*specify column and row label*/
+	print(MRET[1:5,])[colname=vname];
+	print(smean)[colname=vname] [label='Sample Mean'];
+	print(svcv)[colname=vname rowname=vname] [Label='Sample Covariance'];
+
+	/*Following step creates a SAS dataset
+	(simul5) to store the simulated values*/
+	create simul5 from MRET[colname=vname];
+	append from MRET;
+	close simul5;
+quit;
+proc sgplot data=simul5;
+	inset "Amazon and Walmart"/title="Scatter Plot of Monthly Returns" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	scatter x=amzn y=wmt;
+	reg  x=amzn y=wmt/ clm;
+	xaxis label= "Amazon Returns" valuesformat= percent8.2 values=(-0.4 to 0.4 by .1);
+	yaxis label= "Walmart Returns" valuesformat= percent8.2 values=(-0.2 to 0.2 by .1);
+run;
+
+/******************Program 4.6****************/
+/*Simulating High-Frequency Foreign Exchange Returns*/
+/*Simulating 10-minute FX Returns */
+data simul6;
+%let mu=-0.0000066;
+%let sigma=0.003600;
+    format Date datetime.; 
+    keep Date ret;
+    call streaminit(4321);
+	InitDate = '2Jan2021:00:00'dt;
+	dt=0;
+    do i = 1 to 1008;/*Number of 10 mins in one week*/
+		dt+10;
+        	Date=	intnx('minutes',InitDate,dt);
+         Ret= rand('normal',&mu,&sigma);
+         output;
+      end;
+run;
+proc sgplot data=simul6;
+	inset "USD/EUR Exchange Rate"/title="Simulated Ten-Minutes FX Returns" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	series x=date y=Ret;
+	xaxis label= "Date" valuesformat= datetime.;
+	yaxis label= "Returns" valuesformat= percent8.2 values=(-0.02 to 0.02 by .01);
 run;
 
 
 
-/*********Program 4.09A**************************************/
-/*Determinant of Long-Term Stock Returns*/
-%datapull(profit,spx_profit.sas7bdat);
+/******************Program 4.7A****************/
+/*Simulating Random Walk Returns */
+/************Data Step************/
+%let n=100;
+%let sigma=0.001;
+%let mu=0;
 
-proc stepdisc data=spx_profit include=0 short;
-	class pret5;
-	var ceo_tenure logmcap logemp 
-		Instshrout pe esg wacc age;
+data simul7A;
+	format Date datetime.;
+	keep Date ret Err;
+	call streaminit(4321);
+	InitDate = '2Jan2021:00:00'dt;
+	dt=0;
+	Ret=&mu;
+
+	do i = 1 to &n;
+		dt+1;
+		Date=	intnx('minutes',InitDate,dt);/*Simulating Date variable*/
+		Err= (rand("normal",&mu,&sigma)); /*Simulating Gaussian Errors*/
+		Ret = Ret+err; /*Cumulating Values Over time*/
+		output;
+	end;
 run;
 
-
-/*********Program 4.09B**************************************/
-/*Determinant of Long-Term Stock Returns*/
-proc discrim data=spx_profit method=normal crossvalidate 
-outstat=distat outd=discore posterr distance anova manova pool=test;
-	class pret5;
-	var logmcap logemp Instshrout wacc;
-	priors equal;
+proc sgplot data=simul7A;
+	inset "DATA Step"/title="Series Plot of Random Walk with Drift" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	series x=date y=Ret;
+	xaxis label= "Date" valuesformat= datetime.;
+	yaxis label= "FX Returns" valuesformat= percent8.2 values=(-0.04 to 0.04 by .01);
 run;
 
-
-/*********Program 4.09C**************************************/
-/*Determinants of Long-Term Stock Returns*/
-proc discrim data=spx_profit method=npar kernel=normal r=.1 crossvalidate 
-	outstat=distat outd=discore;
-	class pret5;
-	var logmcap logemp Instshrout wacc;
-	priors equal;
-run;
-
-
-
-/*********Program 4.10**************************************/
-/*Estimating Statistical Factor Model of Bank Stock Return*/
-%datapull(banks,banks.sas7bdat);
-ods graphics on;
-
-proc factor data= banks method=ml 
-	score nfact=4 priors=smc heywood 
-	rotate=quartimin plots=all
-	outstat = factstats out=work.factfactors;
-	var rbac rwfc rpnc rjpm rusb rc rtfc rhban rmtb rrf rzion rfitb rcfg rkey rcma;
-run;
-
-
-
-
-/*********Program 4.11**************************************/
-/*Principal Component Analysis of Determinants of Long-Term Profitability*/
-%datapull(profit,spx_profit.sas7bdat);
-ods graphics on;
-
-proc princomp data  = spx_profit standard
-out=pcscores(label="original data and principal components scores for work.spx_profit")
-outstat=pcstats(label="principal components statistics for work.spx_profit")
-   	prefix='comp#'n		vardef=df
-	plots(only)=scree
-	plots(only)=matrix
-	plots(only)=patternprofile
-	plots(only)=pattern ;
-	var logrev logmcap logemp logshrout age beta esg pct_wboard pe ceo_tenure logvol;
-run;
-
-
-
-/*********Program 4.12A**************************************/
-/*Estimating Survival Function Credit Obligors Using PROC LIFETEST*/
-%datapull(loans,lcloans.sas7bdat);
-ods graphics on;
-
-proc lifetest data=lcloans plots=(s(atrisk),ls,lls,h(kernel=epanechnikov) cif)
-	method=pl nelson  intervals=0 to 50 by 1  outsurv=sdata;
-	time timetd*status(0)/;
-run;
-
-
-/*********Program 4.12B**************************************/
-/*Comparing Survival Function Credit Obligors Using PROC LIFETEST*/
-ods graphics on;
-
-proc lifetest data=lcloans method=pl  plots=(s h ls lls) notable outtest=sest intervals=0 to 50 by 1  outsurv=sdata;;
-	time timetd*status(0);
-	strata term/order=internal test=(lr logrank);
-	test dti int_rate;
-run;
-
-
-
-/*********Program 4.13**************************************/
-/*Estimating Proportional Hazard Models of Credit Obligors Using PROC PHREG*/
-ods graphics on;
-
-proc phreg data=lcloans plots=(survival cumhaz roc auc) 
-rocoptions(at=0 to 40 by 10) simple;
-class application_type grade term purpose home_ownership verification_status emp_length;
-model timetd*status(0)= loan_amnt int_rate annual_inc dti pub_rec application_type total_acc revol_util grade term purpose home_ownership
-verification_status emp_length / selection=stepwise slentry=0.25 slstay=0.15 details;
-run;
-
-
-
-/*********Program 4.14**************************************/
-/*Using PROC Syslin to Model the Determinant of Stock return and Volume*/
-%datapull (market,market_data.sas7bdat);
-ods graphics on;
-
-proc syslin data=market_data 2sls;
-	endogenous dret vret;
-	instruments rbond roil rexr rvix rgvix rovix ldret lvret;
-return:
-	model dret= vret lvret rbond roil rexr;
-volume:
-	model vret= dret ldret rvix rgvix rovix;
-run;
-
-
-
-/*********Program 4.15**************************************/
-/*Modeling the Relationship between Unemployment and Consumption*/
-%datapull (conswork,conswork.sas7bdat);
-ods graphics on;
-
-proc varmax data=conswork plots=all;
-	id date interval=month;
-	model  pce unrate = / p=1 method=ml print=(impulse(12) decompose(12));
-	causal group1=(pce) group2=(unrate);
-	causal group1=(unrate)  group2=(pce);
-	output lead= 12 out=forecast;
-run;
-
-
-
-
-/*********Program 4.16**************************************/
-/*Forecasting Monthly Trading Volume on the S&P 500 using Exponsential Smoothing Model*/
-%datapull(spx,rspx_monthly.sas7bdat);
-ods graphics on;
-
-proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
-outest=sesmparms outstat=sesmstats print=all;
-	id date interval=monthly;
-	forecast volume /model=simple;
-run;
-
-proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
-outest=desmparms outstat=desmstats print=all;
-	id date interval=monthly;
-	forecast volume /model=linear;
-run;
-
-proc esm data=rspx_monthly back=12 lead=24 plot=forecastsonly
-outest=tesmparms outstat=tesmstats print=all;
-	id date interval=monthly;
-	forecast volume /model=multwinters;
-run;
-
-
-
-/*********Program 4.17**************************************/
-/*Generating Monthly Forecast of the Wilshire 5000 Index Returns Using UCM*/
-%datapull (conswork,conswork.sas7bdat);
-ods graphics on;
-
-proc ucm data=conswork;
-	id date interval=monthly;
-	model will5000 = t10yr unrate pce jby;
-	irregular;
-	level;
-	cycle;
-	season type=dummy length=12;
-	estimate  outest=ucmparms;
-	forecast back=24 lead=36 plot=(decomp decompvar forecasts );
-	nloptions tech=dbldog maxiter=200;
-run;
-proc print data=ucmparms;
-run;
-
-
-
-/*********Program 4.18**************************************/
-/*Importing dataset into your SAS Environment*/
-%datapull(spxraw,spxraw.sas7bdat);
-%datapull(spxscore,spxscore.sas7bdat);
-data emsas.spxraw ;set work.spxraw ;run;
-data emsas.spxscore ;set work.spxscore;run;
-
-
-
-/*********Program 4.19A**************************************/
-/*Classifying Stock Market Direction Using High Performance Logistic Regression */
-/*Use Macro Variable to create list of predictor variable*/
-%let var_list=CCSIBBB	CFDTR	CFXRATE	CHIST_CALL_IMP_VOL	CHIST_PUT_IMP_VOL CINJCJC	CLEI	CMF_NET_BLCK CMF_NET_NON_BLCK	CMOV_AVG_10D CMOV_AVG_30D	CMOV_AVG_5D COPEN_INT_TOTAL_CALL	COPEN_INT_TOTAL_PUT CPE_RATIO CPX_LAST	CPX_OPEN;	
-
-ods graphics on;
-proc hplogistic data=EMSAS.SPXRAWP;
-	id Dates Partition;
-	class Target;
-	model Target=&var_list. /cutpoint=0.5 link=logit;
-	partition rolevar=partition(train='1' validate='2');
-	selection method=backward(slstay=0.1)  details=all;
-	code file ="%sysfunc(pathname(work))/logscore.sas" group=HPLOG;
-	output out=plogout /allstats;
-	ods output PartFitStats=logstats;
-run;
-	 
-
-/*********Program 4.19A**************************************/
-/*Comparing Prediction to Actual Outcomes*/
-proc sort data=plogout; by dates; run;
-proc sort data=emsas.spxrawp; by dates;run;
-data logout;
-	merge plogout emsas.spxrawp;
-	by dates;
-/*************************************************
-The codes below repeated in other Models.
-**************************************************/
-
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
-
-/*************************************************
-End of repeated code
-**************************************************/
-
-  Model='HP Logistics';
-run;
-
-
-
-/*********Program 4.20**************************************/
-/*Classifying Stock Market Direction Using High Performance GLM */
-proc hpgenselect data=EMSAS.SPXRAWP;
-	class Target;
-	id dates partition;
-	partition role=Partition (validate='2');
-	model Target (event='1')= &var_list./dist=binary link=probit;
-/* Macrovariable list*/
-		selection method=backward(slstay=0.1) details=all;
-		output out=pglmout role=partrole / allstats;
-	  code file="%sysfunc(pathname(work))/glmscore.sas" group=HPGLM ;
-	  ods output fitstatistics=glmstats(where=(Step is missing));
-run;
-
-/*Comparing Prediction to Actual Outcomes*/
-proc sort data=pglmout; by dates; run;
-proc sort data=emsas.spxrawp; by dates;run;
-data glmout;
-merge pglmout emsas.spxraw;
-
-/*********************************
-Same code as Program 4.19B
-**********************************/
-
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
-
-  Model='HP GLM';
-run;
-
-
-
-/*********Program 4.21**************************************/
-/*Classifying Stock Market Direction Using HP Neural Network*/
-/*Creating numeric partition variable*/
-data emsas.spxrawn;
-set emsas.spxrawp;
-npartition = input(partition,2.);
-run;
-
-ods graphics on;
-proc hpneural data=emsas.spxrawn;
-	architecture mlp;
-	input &var_list.;/* Macrovariable  list*/
-	id dates partition;
-	target target/level=nom;
-	hidden 3/act=tanh;
-	train numtries=3 outmodel=model_spxwrap  maxiter=1000;
-	weight  _inverse_priors_;
-	partition rolevar=npartition(validate=2);
-	code file ="%sysfunc(pathname(work))/neuralscore.sas";
-	score out=pneuralout;
-	ods output fitstatistics=neuralstats;
-run;
-
-/*Comparing Prediction to Actual Outcomes*/
-proc sort data=pneuralout;by dates;
-proc sort data=emsas.spxrawn;by dates;
-run; 
-data neuralout;
-merge pneuralout emsas.spxrawn;
-by dates;
-/*********************************
-Same code as Program 4.19B
-**********************************/
-
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
-
-Model='HP Neural';
-run;
-
-
-
-/*********Program 4.22**************************************/
-/*Classifying Stock Market Direction Using HP Decision Tree*/
-ods graphics on;
-proc hpsplit data=emsas.spxrawp  maxbranch=2 splitonce
-	intervalbins=100 maxdepth=10 mincatsize=1 mindist=0.01 alpha=0.2 leafsize=1 nsurrogates=0
-	assignmissing=popular;
-	id dates partition;
-	class target;
-	model target = &var_list.;
-	grow entropy;
-/*Prune based on misclassification and select subtree with lowest misclassification*/
-	prune  misc / min;
-	partition rolevar=partition(train='1' validate='2');
-	code file ="%sysfunc(pathname(work))/splitscore.sas";
-	rules file="%sysfunc(pathname(work))/rules.txt";
-	output out=ptreeout;
-	ods output treePerformance=treestats;
-run;
-
-/*Comparing Predictions with Actual Outcome*/
-proc sort data=ptreeout; by dates; run;
-
-data treeout;
-merge ptreeout emsas.spxraw;
-by dates;
-
-/**********************************
-Same code as Program 4.19B
-**********************************/  
-
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
-
-  Model='HP Tree';
-run;
-
-
-
-/*********Program 4.23**************************************/
-
-/*Classifying Stock Market Direction Using HP SVM*/
-ods graphics on;
-proc hpsvm data=emsas.spxrawp method=ipoint;
-	id dates partition;
-	input &var_list. /level=interval;
-	kernel polynom/ degree=3;
-	target target/;
-	penalty C=20.0;
-	partition  rolevar=partition(validate='2');
-	code file ="%sysfunc(pathname(work))/svmscore.sas";
-	output out=psvmout;
-	ods output fitstatistics=svmstats;
-run;
-
-/*Comparing Prediction to Actual Outcomes*/
-proc sort data=psvmout; by dates; run;
-data svmout;
-merge psvmout emsas.spxraw;
-by dates;
-/*****************************
-Same code as previous algorithms
-**********************************/ 
-
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
- 
-Model='HP SVM';
-run;
-
-
-
-/*********Program 4.24**************************************/
-
-/*Classifying Stock Market Direction Using HP Random Forest*/
-ods graphics on;
-
-proc hpforest data=emsas.spxrawp 
-	maxtrees=100 vars_to_try=10 seed=12345 inbagfraction=0.3
-	maxdepth=10 leafsize=1 alpha=0.05 scoreprole=oob;
-	id dates partition;
-	target target/level=binary;
-	input &var_list. /level=interval; /* Macrovariable list*/
-	partition rolevar=partition(train='1' validate='2');
-	save file ="%sysfunc(pathname(work))/forestscore.sas";
-	score out=pforestout;
-	ods output fitstatistics=pforeststats modelinfo=forestinfo;
-run;
-
-/*SAS Code to the obtain the fit statistics for the selected number of trees*/
-data _null;
-	set forestinfo(where=(parameter='Actual Trees'));
-	call symput("treenum",setting);
-run;
-
-data foreststats;
-	set pforeststats(where=(Ntrees=&treenum));
-run;
-
-/*Comparing Prediction to Actual Outcomes*/
-proc sort data=pforestout;	by dates;run;
-proc sort data=emsas.spxrawp; by dates;run;
-
-data forestout;
-	merge pforestout emsas.spxrawp;
-	by dates;
-
-/*****************************
-Same code as previous algorithms
-**********************************/
-
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
- 
-	Model='HP Forest';
-run;
-
-	
-
-
-
-
-/*********Program 4.25**************************************/
-
-/*Classifying Stock Market Direction Using Ensemble Model*/
-%datapull(Ensemble,Ensemble.sas);/*Pull Ensemble Codes from GitHub*/
-data PEnsemble;
-set emsas.spxrawp;
-%include "%sysfunc(pathname(work))/Ensemble.sas";
-/*Ensemble Code includes scoring from previous models 
-HPLOGISTICS, HPGENSELECT, HPNEURAL, HPTREE, HPSVM*/
-/***Average of Posterior probabilities from each model is calculated**
- **Classification is then performed using the 50% threshold***/
-run;
-
-/*Comparing Prediction to Actual Outcomes*/
-Data Ensembleout;
-set PEnsemble;
-/**********************************
-Same code as Program 4.19B
-**********************************/ 
-   Model='Ensmbl';
-   
-	if (Pred < 0.5) then
-		P_Target = 0;
-	else P_Target = 1;
-   format Classification $10. Role $9. Model $15.;
-    if (Target = P_Target) then Classification = 'Correct';
- 	else Classification = 'Incorrect';
-	if Partition = '1' then
-		Role ='Train';
-	else Role ='Validate';
-  if P_Target = 1 and Target=1 then TP=1; else TP='';
-  if P_Target = 1 and Target=0 then FP=1; else FP='';
-  if P_Target = 0 and Target=1 then FN=1; else FN='';
-  if P_Target = 0 and Target=0 then TN=1; else TN='';
-  label TP='True Positive' FP='False Positive' FN='False Negative' TN='True Negative';
-
-run;
-
-
-
-/*********Program 4.26**************************************/
-/*Print Summary of Estimation Fit Statistics*/
-proc print data=logstats;
-	title 'Logistic Regression Statistics';
-proc print data=glmstats;
-	title 'GLM Regression Statistics';
-proc sgrender data=neuralstats template=HPDM.HPNEURAL.FitStatistics;
-	title 'Neural Network Statistics';
-proc print data=treestats;
-	title 'Decision Tree Statistics';
-proc sgrender data=svmstats template=HPDM.HPSvm.FitStatistics;
-	title 'Support Vector Machine Statistics';
-proc print data=foreststats;
-	title 'Random Forest Statistics';
-run;
-title;
-
-
-
-/*********Program 4.27**************************************/
-/*Merging Predictions and Classifications for Further Analysis*/
-data Modelcomp1;
-set logout(keep=dates model target role p_target classification TP FP FN TN)
-glmout(keep=dates model target role p_target classification TP FP FN TN)
-neuralout(keep=dates model target role p_target classification TP FP FN TN) 
-treeout(keep=dates model target role p_target classification TP FP FN TN)
-svmout(keep=dates model target role p_target classification TP FP FN TN)
-forestout(keep=dates model target role p_target classification TP FP FN TN)
-Ensembleout(keep=dates model target role p_target classification TP FP FN TN);
-run;
-
-/*Using Proc Tabulate to Compute the Classfication Accuracy*/
-proc tabulate data=Modelcomp1;
-	class model classification role;
-	table  classification*(pctn<classification>=''),Model='Comparing Model Classification Accuracy'*role ;
-run;
-
-
-
-/*********Program 4.28**************************************/
-
-/*Plotting Classification Table for All Model*/
-proc sort data=Modelcomp1 out=Plotdata;
-	by Model Role;
-run;
-
-/*Using PROC SGPANEL to Produce Cluster Performance Graphs*/
-ods graphics / reset width=6.4in height=4.8in imagemap;
-title 'Classification Chart for Machine Learning Algorithms';
-
-proc sgpanel data=Plotdata pctlevel=cell ;
-	panelby role model/ onepanel rows=2 noheaderborder novarname 
-		colheaderpos=bottom spacing=2;
-vbar Target / group=Classification groupdisplay=stack stat=percent transparency=0.10 ;
-	colaxis label='Target';
-	rowaxis label='Prediction Percent';
-run;
-title;
-
-
-/*********Program 4.29**************************************/
-/*Using Proc Tabulate to Compute the Classfication Matrix*/
-proc tabulate data=Modelcomp1;
-	class model target p_target role;
-	table  role*Target='Target', 
-	Model='Comparing Model Classification Matrix'*(pctn<P_Target>='Predicted')*P_Target='' ;
-run;
-
-
-/*********Program 4.30**************************************/
-/*Using Proc SQL to Calculate Classification Measures*/
-proc sql;
-	create table modelcomp2 as select Role as Role, Model as  Model, 
-	(sum(TP)+sum(TN))/(sum(TP)+sum(TN)+sum(FP)+sum(TN)) as Accuracy , 
-	1-(sum(TP)+sum(TN))/(sum(TP)+sum(TN)+sum(FP)+sum(TN)) 
-label="Misclassfication Rate" as Misclass , sum(TP)/(sum(TP)+sum(FP)) as 
-	Precision, sum(TP)/(sum(TP)+sum(FN)) as Sensitivity, 
-sum(TN)/(sum(TN)+sum(FP)) as Specificity, 1-sum(TN)/(sum(TN)+sum(FP)) 
-label="1-Specificity" as MSpecificity from plotdata group by Role, Model.
+/******************Program 4.7B****************/
+/*Simulating Random Walk Returns */
+/************IML Procedure************/
+%let N=100;
+%let sigma=0.001;
+%let mu=0;
+
+proc iml;
+	Rt =j(&n,2,.);
+	xj= j(&n,1,.);
+	InitDate = '2Jan2021:00:00'dt; /*Initial Date*/
+	call randseed(4321);
+	call randgen(xj,"Normal",&mu,&sigma);
+	Rt[,2]=xj;
+	Rt[,2]=cusum(Rt[,2]); /*Cumulating Values over time*/
+	dt=0;
+
+	do i = 1 to &n;
+		dt=dt+1;
+		Rt[i,1]=intnx('minutes',InitDate,dt);/*Simulating Date variable*/
+	end;
+
+	vname ={"Date" "Ret"}; /*specify column and row label*/
+	create simul7B from Rt[colname=vname];
+	append from Rt;
+	close simul7B;
 quit;
 
-title 'Summary of Fit Statistics from Estimated Models';
-proc print data=modelcomp2 label style(header)=[width=0.8 in textalign=center]noobs;
-	var Role model;
-var Accuracy Misclass Precision Sensitivity Specificity Mspecificity/style(data)=[textalign=center];
-format Accuracy best4.2 Misclass best4.2 Precision best4.2 Sensitivity best4.2 Specificity best4.2 Mspecificity best4.2;
-run;
-title;
-
-
-
-/*********Program 4.31A**************************************/
-/*Merging Data for ROC Curves*/
-data Modelcomp3;
-	merge 
-		logout(rename=(Pred=Log_Pred P_Target=Log_Target Classification=Log_class))
-		glmout(rename=(Pred=Glm_Pred P_Target=Glm_Target Classification=Glm_class)) treeout(rename=(P_Target1=Tree_Pred P_Target=Tree_Target Classification=Tree_class))	
-		svmout(rename=(P_Target1=SVM_Pred P_Target=SVM_Target Classification=SVM_class)) 
-		forestout(rename=(P_Target1=Forest_Pred P_Target=Forest_Target Classification=Forest_class)) 
-		neuralout(rename=(P_Target1=Neural_Pred P_Target=Neural_Target Classification=Neural_class))
-		Ensembleout(rename=(P_Target1=Ens_Pred P_Target=Ens_Target Classification=Ens_class));
-	by dates;
+proc sgplot data=simul7B;
+	inset "PROC IML"/title="Series Plot of Random Walk with Drift" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	series x=date y=Ret;
+	xaxis label= "Date" valuesformat= datetime.;
+	yaxis label= "FX Returns" valuesformat= percent8.2 values=(-0.04 to 0.04 by .01);
 run;
 
-
-
-/*********Program 4.31B**************************************/
-/*Using PROC LOGISTICS to Compare ROC Curves*/
-%let _ROCOVERLAY_ENTRYTITLE = Comparing ROC Curves (Data Role=Validate);
-
-proc logistic data=modelcomp3 (where=(role='Validate'));
-	model target(event='1')=Log_Pred GLM_Pred Neural_Pred 
-		Tree_Pred SVM_Pred 	Forest_Pred Ens_Pred / nofit;
-	roc 'HPReg' pred=Log_Pred;
-	roc 'HPGLM' pred=GLM_Pred;
-	roc 'HPNNA' pred=Neural_Pred;
-	roc 'HPTree' pred=Tree_Pred;
-	roc 'HPSVM' pred=SVM_Pred;
-	roc 'HPForest' pred=Forest_Pred;
-	roc 'Ensmbl' pred=Ens_Pred;
-	ods select ROCOverlay;
-run;
-%symdel _ROC_ENTRYTITLE;
-
-
-/*********Program 4.32**************************************/
-/*Backtesting Champion Model Using Scoring Code*/
-/*Pull Scoring Code for Ensemble Model from GitHub*/
-%datapull(Ensemble,Ensemble.sas);
-
-/*Scoring Holdout Data Using DATA Step*/
-data pscorespx;
-	set emsas.spxscore;
-	%include "%sysfunc(pathname(work))/Ensemble.sas";
+proc univariate data=simul7a;
+	var Err Ret;
 run;
 
-data scorespx;
-	set pscorespx;
-	format Classification $10. CMatrix $8.;
-	if (I_Target=Index_out) then do;
-		Classification='Correct';
-		Algo_ret=abs(OTO_FRet);/*Open-to-Open Futures Return*/
+/******************Program 4.8****************/
+/*Simulating the Sample Path for S&P 500 Index*/
+%let smean=0.0067658;/*Mean Return*/
+%let ssd = 0.04465726;/*Standard Deviation of Returns*/
+%let inprice=3756.07; /*Initial Index Level*/
+
+data simul8;
+	format Date monyy.;
+	keep Date Fmret Sumret Price;
+	call streaminit(4321);
+	InitDate = '2Jan2021'd;
+	Sumret=&smean-&ssd *0.5;
+
+	do iter=1 to 24; /*number of replication*/
+		Date=intnx('month',InitDate,dt,'end');/*Simulating Dates*/
+		Fmret =rand("normal",&smean,&ssd);/*Simulating Monthly Returns*/
+		Sumret =sumret+fmret; /*Cumulating the returns*/
+		Price =&inprice*exp(sumret);/*Continuously compounded Prices*/
+		dt+1;
+		output;
 	end;
-	else do;
-		Classification='Incorrect';
-		Algo_Ret=-1*abs(OTO_FRet);
+
+	label
+		Fmret='Simulated Monthly Returns'
+		Price = 'Simulated Monthly Index Level'
+		Sumret = 'Cumulative Monthly Returns';
+run;
+
+proc sgplot data=simul8;
+	inset "January 2021 to December 2022" 
+		/title="Simulated Values of S&P 500" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	series x=date y=Price;
+	series x=date y=fmret/ y2axis;
+	xaxis label= "Date" valuesformat= monyy. values=('31Jan21'D to '31Dec22'D by month);
+	yaxis  valuesformat= best8.2 values=(1000 to 6500 by 500);
+	y2axis valuesformat= percent8.2 values=(-0.1 to 0.4 by .1);
+run;
+
+/******************Program 4.9****************/
+%datapull(vix,vix.sas7bdat);
+ods graphics on;
+
+proc arima data=VIX (where=(date>'31dec2017'd)) out=work.tarama 
+	plots(unpack)=(series(acf pacf) residual(acf pacf normal) forecast(forecast));
+	identify var=vixcls;
+
+	/*calculates the first difference of the volume AR(1,1,1)*/
+	estimate p=1 plot;
+run;
+
+/******************Program 4.9A****************/
+
+/*Simulating Daily CBOE VIX Index Ornstein-Uhlenbeck Process*
+/*Numerical Solution*/
+%let N=730;
+%let sigma=2.412801;
+%let alpha=13.8262;
+%let beta=0.97559;
+
+proc iml;
+	X0=0;
+	theta=1-&beta; /*Theta is calculated from beta*/
+	mu=&alpha/theta; /*Mu is calculated from regression alpha called */
+	xj= j(&n,1,.); /*vector random variables*/
+	Volt=j(&n,1,0); /*Interest rate vector*/
+	Vol=j(&n,2,&mu); /*Vector to merge simulate rates and date*/
+	InitDate = '1jan2021'd; /*Initial Date*/
+	call randseed(4321);
+	call randgen(xj,"Normal");
+	Volt=X0*exp(-theta)+mu*(1-exp(-theta))+&sigma*exp(-2*theta)*xj;
+	Vol[,2]=Volt;
+	dt=0;
+
+	do i = 1 to &n;
+		dt=dt+1;
+		Vol[i,1]=intnx('day',InitDate,dt);/*Simulating Date variable*/
 	end;
-	EXAlgo_Ret=Algo_Ret-RF; /*Excess Algorithmic Return*/
-	EXIndex_Ret=Index_Ret-RF;/*Excess Index Return*/
-	if I_Target=1 and  Index_out=1 then	CMatrix='TP';
-	if I_Target=1 and  Index_out=0 then CMatrix='FP';
-	if I_Target=0 and  Index_out=1 then	CMatrix='FN';
-	if I_Target=0 and  Index_out=0 then	CMatrix='TN';
-label CMatrix='Prediction Condition' 
-Algo_Ret='Algorithmic Returns';
+run series(Vol[,1],Vol[,2]);
 
-	/*Cumulative Returns*/
-	Sumiret+Index_Ret; /*Passive Index Buy and Hold*/
-	Sumaret+algo_Ret;  /*Algorithmic Based*/
-	IndexVal =1000000*exp(sumiret); /* Index Portfolio Value*/
-	AlgoVal = 1000000*exp(sumaret);/* Algorithmic Portfolio Value*/
-	format IndexVal dollar16.2 AlgoVal dollar16.2;
-	label IndexVal= 'Index Portfolio Values' AlgoVal ='Algorithmic Portfolio Values';
+vname ={"Date" "VIX"}; /*specify column and row label*/
+create simul9A from Vol[colname=vname];
+append from Vol;
+close simul9A;
+quit;
+
+proc sgplot data=simul9A;
+	inset "Ornstein-Uhlenbeck Process -Numerical Approach"/title="Simulating CBOE Volatility (VIX) Index" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	series x=date y=VIX;
+	xaxis label= "Date" valuesformat=mmddyy10. values=('2jan21'd to '31dec21'd by month) interval=day;
+	yaxis label= "Volatility" valuesformat= best8.2 values=(0 to 30 by 5);
 run;
 
+/******************Program 4.9B****************/
+/*Simulating Daily CBOE Volatility (VIX) Index Using AR(1) Model*/
+%let N=730;
+%let sigma=2.412801;
+%let mu=13.8262;
+%let beta=0.97559;
 
+proc iml;
+	xj= j(&n,1,.); /*vector random variables*/
+	Volt=j(&n,1,0); /*Interest rate vector*/
+	Vol=j(&n,2,&mu); /*Vector to merge simulate rates and date*/
+	InitDate = '1jan2021'd; /*Initial Date*/
+	call randseed(4321);
+	call randgen(xj,"Normal");
+	Volt=&mu+&beta*lag(Volt)+&sigma*xj;
+	Vol[,2]=Volt;
+	dt=0;
 
-/*********Program 4.33**************************************/
-/*Graphing Classification Accuracy Using PROC SGPLOT*/
-ods graphics / reset width=6.4in height=4.8in imagemap;
+	do i = 1 to &n;
+		dt=dt+1;
+		Vol[i,1]=intnx('day',InitDate,dt);/*Simulating Date variable*/
+	end;
 
-proc sgplot data=Scorespx;
-	title height=12pt "Prediction Accuracy (Backtesting Period)";
-vbar Index_Out / group=Classification groupdisplay=stack stat=percent dataskin=crisp;
-	yaxis grid label="Prediction Percent";
+	call series(vol[,1],vol[,2]);
+	vname ={"Date" "VIX"}; /*specify column and row label*/
+	create simul9B from Vol[colname=vname];
+	append from Vol;
+	close simul9B;
+quit;
+
+proc sgplot data=simul9B;
+	inset "Discretized OU Process - AR(1)"/title="Simulating CBOE Volatility (VIX) Index" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	series x=date y=VIX;
+	xaxis label= "Date" valuesformat=mmddyy10. values=('2jan21'd to '31dec21'd by month) interval=day;
+	yaxis label= "Volatility" valuesformat= best8.2 values=(0 to 30 by 5);
 run;
 
-ods graphics / reset;
+/******************Program 4.10****************/
+/*Montecarlo Simulation of S&P 500 Levels*/
+%let smean=0.0067658;
+%let ssd = 0.04465726;
+%let inprice=3756.07;
+%let nreps=1000;/*number of repititions*/
+
+data simul10;
+	format Date monyy.;
+	keep Date sampleID Fmret Sumret Price;
+	InitDate = '2Jan2021'd;
+	Sumret=&smean-&ssd *0.5;
+
+	do sampleID=1 to &nreps;
+		do iter=1 to 24; /*number of replication*/
+			Date=intnx('month',InitDate,dt,'end');/*Simulating Dates*/
+			Fmret =rand("normal",&smean,&ssd);/*Simulating Monthly Returns*/
+			Sumret =sumret+fmret; /*Cumulating the returns*/
+			Price =&inprice*exp(sumret);/*Continuously compounded Prices*/
+			dt+1;
+			output;
+		end;
+
+		dt=0;
+		sumret=0;
+	end;
+
+	label
+		Fmret='Simulated Monthly Returns'
+		Price = 'Simulated Monthly Index Level'
+		Sumret = 'Cumulative Monthly Returns'
+		sampleID = 'Sample ID';
+run;
+
+/*Graphing Simulated SP500 Levels*/
+proc sgplot data=simul10;
+	inset "January 2021 to December 2022" 
+		/title="Monte Carlo Simulation of S&P 500 Index Levels" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center;
+	series x=Date y=Price / group=SampleID;
+	xaxis grid;
+	yaxis grid values=(2000 to 9000 by 1000);
+	;
+run;
+
+/******************Program 4.11****************/
+/*Calculating Average Path of the S&P 500 Index*/
+proc sort data=simul10 out=ssimul10;
+	by Date;
+run;
+
+proc means data=ssimul10 mean noprint;
+	by date;
+	var price;
+	output out=out_simul10 mean=Price;
+run;
+
+proc sgplot data=out_simul10;
+	inset "Average Path from January 2021 to December 2022" 
+		/title="Monte Carlo Simulation of S&P 500 Index Levels" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center;
+	series x=Date y=Price;
+	xaxis  grid valuesformat= monyy. values=('31Jan21'D to '31Dec22'D by month);
+	yaxis grid values=(2000 to 6000 by 1000);
+run;
+
+proc means data=simul10(where=(Date='31Dec22'D))  mean std min max median  p5 
+	p10 q1 q3 p95 p99 qmethod=os;
+	var Price;
+run;
+
+/******************Program 4.12****************/
+/*Calculating NPV and IRR Using SAS*/
+data capbud1;
+	format CF0 nlmny12.2  CF1 nlmny12.2 CF2 nlmny12.2 
+		CF3 nlmny12.2 CF4 nlmny12.2 CF5 nlmny12.2 Rate percent8.2;
+	Rate=0.13;
+	CF0=-53000;
+	CF1=15800;
+	CF2=13100;
+	CF3=16700;
+	CF4=19700;
+	CF5=14300;
+	NPV=finance('npv',rate,cf1,cf2,cf3,cf4,cf5)+cf0;
+	IRR=finance('irr',cf0,cf1,cf2,cf3,cf4,cf5);
+	format NPV nlmny12.2 IRR percent8.2;
+run;
+
+title 'Capital Expenditure Worksheet';
+
+proc print data=capbud1 noobs;
+	var CF0 CF1 CF2 CF3 CF4 CF5 Rate;
+	var NPV IRR/style(data)={just=l fontweight=bold };
+run;
+
 title;
 
+/******************Program 4.13A****************/
+/*Capital Budgeting Worksheet in SAS*/
+/*Storing Key Project Info in Dataset*/
+data pinfo;
+	IC=	5245000;
+	TL= 4;
+	SPU= 35;
+	CPU= 12;
+	FC=	550000;
+	NWC= 132400;
+	RR=	0.123;
+	TR=	0.21;
+	QTY	= 120000;
+run;
+/******************Program 4.13B****************/
+/*Creating Capital Budget Worksheet Using PROC COMPUTAB*/
+title 'ABA Manufacturing Inc.';
+title2 'Capital Expenditure Worksheet ';
 
+proc computab data=pinfo out=capbud2;
+	cols YR0 YR1 YR2 YR3 YR4 /'Year' f=10.2;
+	col  YR0/ 'Zero' zero=' ';
+	col  YR1/ 'One';
+	col  YR2/ 'Two';
+	col  YR3/ 'Three';
+	col  YR4/ 'Four';
 
-/*********Program 4.34**************************************/
-/*Comparing Portfolio Performance Using PROC REPORT*/
-proc report data=scorespx nowd ;
-columns ('Backtesting the Performance of Algorithmic Portfolio Relative to Passive Index Strategy'(CMatrix
-(('Algorithmic Portfolio'(Algo_Ret=Asum Algo_Ret=Amean Algo_Ret=Astd AAmean AAstd ExAlgo_Ret=EXAmean ExAlgo_Ret=EXAstd  ASharpe))
-('Index Portfolio' (Index_Ret=Isum Index_Ret=Imean Index_Ret=Istd AImean AIstd ExIndex_Ret=EXImean ExIndex_Ret=EXIstd ISharpe))) ));
-	
-	define Cmatrix/group style(header)=[textalign=left]   left;
-/*****************Algorithmic Portfolio Calculations****************/
- 	define Asum/analysis sum format=percent8.2 'Total Return' center;
-define Amean/analysis mean format=percent8.2 'Mean Daily Return' center noprint;
-define Astd/analysis std format=percent8.2 'Standard Deviation' center noprint;
-define AAmean/computed format=percent8.2 'Annualized Mean' center;
- 	compute AAmean;
- 	AAmean =amean*252;
- 	endcomp;
-define AAstd/computed format=percent8.2 'Annualized Standard Deviation' center;
- 	compute AAstd;
- 	AAStd =Astd*sqrt(252);
- 	endcomp;
- 	
- 	/*Calculating Mean Excess Return and Standard of Excess Return*/
-	define ExAmean/analysis mean format=percent8.2  noprint ;
-	define EXAstd/analysis std format=percent8.2 noprint ;
+	/*Defining Proforma Income Statement Items*/
+	row Rev /'Income Statement' 'Sales' format= nlmny16.2;
+	row	COGS /	'Cost of Sales'  format= nlmny16.2;
+	row GP  /'Gross Profit' dol ul format= nlmny16.2;
+	row DP /'Depreciation' format= nlmny16.2;
+	row	SGA	 /'General Expense' ul format= nlmny16.2;
+	row EBT /'Taxable Income' ul format= nlmny16.2;
+	row Tax	 / 'Taxes'  format= nlmny16.2;
+	row NI  /'Net Income' dol dul format= nlmny16.2 skip;
 
- 	define ASharpe/computed format=best6.2 'Sharpe Ratio' center;
- 	compute ASharpe;
- 	 if Amean>0 then ASharpe=EXAmean/ExAstd;
- 	endcomp;
+	/*Defining Cash Flow Worksheet Items*/
+	row OCF /' '
+		'Cash Flow Estimation:'
+		'Project Cash Flows' 'Operating Cash Flow' format= nlmny16.2;
+	row CAPEX /'Capital Expenditure'  format= nlmny16.2 zero=' ';
+	row WCR /'Working Capital Requirement'  format= nlmny16.2  zero=' ';
+	row CF/ 'Net Project Cash Flow' dol dul format= nlmny16.2 skip;
 
-	
-/*****************Passive Portfolio Calculations******************/
- 	define Isum/analysis sum format=percent8.2 'Total Return' center;
-define Imean/analysis mean format=percent8.2 'Mean Daily Return' center noprint;
-define Istd/analysis std format=percent8.2 'Standard Deviation' center noprint;
-define AImean/computed format=percent8.2 'Annualized Mean' center;
- 	compute AImean;
- 	AImean =Imean*252;
- 	endcomp;
-define AIstd/computed format=percent8.2 'Annualized Standard Deviation' center;
- 	compute AIstd;
- 	AIstd =Istd*sqrt(252);
- 	endcomp;
- 	
- 	 /*Calculating Mean Excess Return and Standard of Excess Return*/
- 	define EXImean/analysis mean  format=percent8.2  noprint;
-	define ExIstd/analysis std  format=percent8.2 noprint;
+	/*Defining Decision Criteria*/
+	row NPV /' '
+		'NPV Calculation:'
+		'Net Present Value' format= nlmny16.2 zero=' ';
+	row IRR/'Internal Rate of Return'  LJC format=percent8.2 zero=' ';
 
- 	define ISharpe/computed format=best6.2  'Sharpe Ratio' center;
- 	compute ISharpe;
- 	if CMatrix='Total' then ISharpe=EXImean/EXIstd;
- 	endcomp;
- 	rbreak after / summarize style=[font_weight=bold  ] ;
- 	 compute Cmatrix ; 
- 	 if CMatrix='' then
-		CMatrix='Total'  ;
-	endcomp;
+	/*Populating Income Statement Items with Values*/
+colcalc:
+
+	/*Revenue of 5% per year and cost increase of 3%*/
+	if REV then do;
+		YR1=QTY*SPU;
+		YR2=YR1*1.05;
+		YR3=YR2*1.05;
+		YR4=YR3*1.05;
+	end;
+
+	if COGS then do;
+		YR1=QTY*CPU;
+		YR2=YR1*1.03;
+		YR3=YR2*1.03;
+		YR4=YR3*1.03;
+	end;
+
+rowcalc:
+
+	if  _COL_>1  then do
+		GP=REV-COGS; /*Gross Profit*/
+		DP = IC/TL;  /*Annual Depreciation*/
+		SGA = FC;    /*Selling and General Administrative*/
+		EBT = GP-DP-SGA; /*Taxable Income*/
+		TAX =TR*EBT;		 /*Income Taxes*/
+		NI = EBT-TAX;	 /* Net Income*/
+
+		/*Cash Flow Begins Here*/
+CashFlows:
+		OCF = EBT+DP-TAX; /*Can also be NI+DP*/
+		WCR = 0.02*Rev;
+	end;
+
+	/*Controls to enter only values for initial date*/
+	if _col_=1 then do;
+
+		/*Initial CAPEX and WCR*/
+		CAPEX = ic;
+		WCR =NWC;
+	end;
+
+	CF = OCF-CAPEX-WCR;
+
+	/*Decision Critieria*/
+Decisions:
+	npv=cf;
+	irr=cf;
+colcalc2:
+	if npv then do;
+		temp1 =finance('npv',rr,yr1, yr2, yr3, yr4)+yr0;
+		yr0=temp1;
+		yr1=0;
+		yr2=0;
+		yr3=0;
+		yr4=0;
+		yr5=0;
+	end;
+
+	if IRR then do;
+		temp2 =finance('irr',yr0, yr1, yr2, yr3, yr4);
+		yr0=temp2;
+		yr1=0;
+		yr2=0;
+		yr3=0;
+		yr4=0;
+	end;
 run;
 
-
-
-
-/*********Program 4.35**************************************/
-/* Using SGPLOT to Graph the Relationship Between Posterior Probabilities and Actual Index Return*/
-Proc sgplot data=scorespx;
-	title height=12pt "Predicted Probabilities of Positive Market Movement";
-scatter x = index_ret y=P_Target1/group=I_Target markeroutlineattrs=( thickness=1) markerattrs=(symbol=circlefilled size=10)  ;
-reg x = index_ret y=P_Target1/  clm ;
-yaxis label='Predicted Probabilities';
-xaxis valuesformat=percent8.2 values=(-0.04 to 0.03 by 0.01);
-run;
-
-
-
-/*********Program 4.36**************************************/
-/*Comparing Portfolio Values Using PROC SGPLOT*/
-proc sgplot data=scorespx;
-	title height=14pt "Daily Portfolio Values";
-	series x=Dates y=IndexVal/;
-	series x=  Dates y=AlgoVal;
-	yaxis label='Daily Portfolio Values';
-run;
 title;
+title2;
+
+/******************Program 4.14A****************/
+/*SAS Macro to Implement Monte Carlo Simulation of Capital Budgeting*/
+%macro capsimul(nrep); /*specify number of reps*/
+	proc datasets nodetails nolist;
+		delete simul11;
+	run;
+
+	%local  i nrep; /*local macro variable*/
+
+	%do i=1 %to &nrep;
+
+		/******Reused Same Code from Program 3.XXXXX****/
+		data pinfo;
+			IC	=	5245000;
+			TL	=	4;
+			SPU	=	35;
+			CPU	=	12;
+			FC	=	550000;
+			NWC	=	132400;
+			RR	=	0.123;
+			TR	=	0.21;
+			QTY	= 120000 *(1+rand("normal",0,0.1)) ;/*simulating quantity sold*/
+		run;
+
+		proc computab data=pinfo out=capbud2 noprint;
+			cols YR0 YR1 YR2 YR3 YR4 /'Year' f=10.2;
+			col  YR0/ 'Zero' zero=' ';
+			col  YR1/ 'One';
+			col  YR2/ 'Two';
+			col  YR3/ 'Three';
+			col  YR4/ 'Four';
+
+			/*Defining Proforma Income Statement Items*/
+			row Rev /'Income Statement' 'Sales' format= nlmny16.2;
+			row	COGS /	'Cost of Sales'  format= nlmny16.2;
+			row GP  /'Gross Profit' dol ul format= nlmny16.2;
+			row DP /'Depreciation' format= nlmny16.2;
+			row	SGA	 /'General Expense' ul format= nlmny16.2;
+			row EBT /'Taxable Income' ul format= nlmny16.2;
+			row Tax	 / 'Taxes'  format= nlmny16.2;
+			row NI  /'Net Income' dol dul format= nlmny16.2 skip;
+
+			/*Defining Cash Flow Worksheet Items*/
+			row OCF /' '
+			'Cash Flow Estimation:'
+			'Project Cash Flows' 'Operating Cash Flow' format= nlmny16.2;
+			row CAPEX /'Capital Expenditure'  format= nlmny16.2 zero=' ';
+			row WCR / 'Working Capital Requirement'  format= nlmny16.2  zero=' ';
+			row CF	/ 'Net Project Cash Flow' dol dul format= nlmny16.2 skip;
+
+			/*Defining Decision Criteria*/
+			row NPV /' '
+				'NPV Calculation:'
+				'Net Present Value' format= nlmny16.2 zero=' ';
+			row IRR/'Internal Rate of Return'  LJC format=percent8.2 zero=' ';
+
+			/*Populating Income Statement Items with Values*/
+	colcalc:
+
+			/*Revenue of 5% per year and cost increase of 3%*/
+			if REV then do;
+				YR1=QTY*SPU;
+				YR2=YR1*1.05;
+				YR3=YR2*1.05;
+				YR4=YR3*1.05;
+			end;
+
+			if COGS then do;
+				YR1=QTY*CPU;
+				YR2=YR1*1.03;
+				YR3=YR2*1.03;
+				YR4=YR3*1.03;
+			end;
+
+	rowcalc:
+
+			if  _COL_>1  then do
+				GP=REV-COGS; /*Gross Profit*/
+				DP = IC/TL;  /*Annual Depreciation*/
+				SGA = FC;    /*Selling and General Administrative*/
+				EBT = GP-DP-SGA; /*Taxable Income*/
+				TAX =TR*EBT;		 /*Income Taxes*/
+				NI = EBT-TAX;	 /* Net Income*/
+
+				/*Cash Flow Begins Here*/
+		CashFlows:
+				OCF = EBT+DP-TAX; /*Can also be NI+DP*/
+				WCR = 0.02*Rev;
+			end;
+
+			/*Controls to enter only values for initial date*/
+			if _col_=1 then do;
+
+				/*Initial CAPEX and WCR*/
+				CAPEX = ic;
+				WCR =NWC;
+			end;
+
+			CF = OCF-CAPEX-WCR;
+
+			/*Decision Critieria*/
+	Decisions:
+			npv=cf;
+			irr=cf;
+	colcalc2:
+
+			if npv then do;
+				temp1 =finance('npv',rr,yr1, yr2, yr3, yr4)+yr0;
+				yr0=temp1;
+				yr1=0;
+				yr2=0;
+				yr3=0;
+				yr4=0;
+				yr5=0;
+			end;
+
+			if IRR then do;
+				temp2 =finance('irr',yr0, yr1, yr2, yr3, yr4);
+				yr0=temp2;
+				yr1=0;
+				yr2=0;
+				yr3=0;
+				yr4=0;
+			end;
+		run;
+
+		/****Reused Codes Ends Here***/
+
+		/*Merge project info data with cap budgeting results*/
+		data _simul_;
+			merge pinfo(keep=QTY) capbud2( obs=1 keep=NPV IRR);
+			sampleID=&i;
+			label QTY= 'Quantity Sold' NPV='Net Present Value' IRR='Internal Rate of Return';
+			format NPV nlmny16.2 QTY best10.2 IRR percent8.2;
+		run;
+
+		/*updated table with results from new interation*/
+		proc append base=simul11 data=_simul_ force;
+		run;
+
+	%end;
+%mend;
+
+/*Macro invoked to do 1000 repetitions*/
+%capsimul(1000);
 
 
+
+
+proc tabulate data=simul11;
+	var qty npv irr;
+	table qty*F=bestn10.2 npv*F=dollar15.2 irr*F=percent8.2,(min median mean max  p5  p10 );
+run;
+
+/******************Program 4.14B****************/
+/*SAS Code to Graph Projects NPV Distribution*/
+proc sgplot data=simul11;
+	inset "NPV Distribution (Monte Carlo Simulation)"/title="ABA Manufacturing Inc." position=top 
+	textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+	titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	histogram npv / nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=bipb );
+	density npv/ legendlabel= "(Normal Density Plot for Project's NPV)";
+	yaxis values=(0 to 20 by 2.5);
+run;
+
+proc sgplot data=simul11;
+	inset "Quantity Sold Distribution (Monte Carlo Simulation)"/title="ABA Manufacturing Inc." position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	histogram qty / nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=bipb );
+	density qty/ legendlabel= "(Normal Density Plot for Project's NPV)";
+	yaxis values=(0 to 20 by 2.5);
+run;
