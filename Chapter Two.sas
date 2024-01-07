@@ -49,7 +49,7 @@ proc timedata data=ecodata out=necodata;
 	var SPX INJCJC MBAVCHNG ETSLTOTL USURTOT GDP CPI;
 run;
 
-Proc Print data=necodata;
+proc print data=necodata;
 run;
 
 /*2.3B*/
@@ -382,7 +382,7 @@ run;
 /*Using Heatmap to Display Portfolio Attribute*/
 proc sgplot data=Portfolio_Attrib;
 	title 'Sector-Level Portfolio Characteristics';
-	heatmap x=mcapc y=sector/ colorresponse=pe;
+	heatmap x=mcapc y=sector/ colorresponse=pe colorstat=mean weight=weights;
 run;
 
 /***************Program 2.18****************/
@@ -523,19 +523,18 @@ data PortRR;
 run;
 
 /*Reporting Sector-Level Portfolio Performance*/
-/*Sum Attributes that Are Weighted Separately Those that are*/
-Proc Tabulate data=PortRR(where=(period=2)) 
+/*Sum Attributes that Are Weighted Separately Those that are not*/
+proc tabulate data=PortRR(where=(period=2)) 
 	OUT=WORK.DSTATSONE(LABEL="Portfolio Statistics"
 	Drop=_Type_ _Page_ _Table_
 	rename=(BGweights_sum=BGWeights weights_sum=EDWeights Quantity_sum=Quantity Mholdings_sum=Holdings Income_sum=Income));
 	Var  BGWeights Weights Quantity MHoldings Income ; /*Rename Output*/
 	class Date;
 	class sector;
-
 	Table Date*sector* sum, BGWeights*F=percent8.2 Weights*F=percent8.2  Quantity MHoldings*F=dollar16.2  Income*F=dollar16.2;
 run;
 
-Proc Tabulate data=PortRR(where=(period=2)) 
+proc tabulate data=PortRR(where=(period=2)) 
 	OUT=WORK.DSTATSTWO(
 	LABEL="Portfolio Statistics" 
 	Drop=_Type_ _Page_ _Table_
@@ -549,12 +548,12 @@ Proc Tabulate data=PortRR(where=(period=2))
 		weight bgweights;
 run;
 
-Proc sort data=Benchmark_Attrib out=BMAttrib;
+proc sort data=Benchmark_Attrib out=BMAttrib;
 	by sector;
 run;
 
 /*Joining Dstats one and two with BMAttrib*/
-Proc sql;
+proc sql;
 	create table Mergedstats as select * from dstatsone left join dstatstwo
 		on dstatsone.sector=dstatstwo.sector left join BMAttrib on dstatstwo.sector=BMAttrib.sector;
 quit;
@@ -563,9 +562,8 @@ proc print data=mergedstats(drop=date) label;
 run;
 
 /*Performance Attributions*
-Formatting the variables in the Performance
-Attribution dataset*/
-Data Performance_Attrib;
+Formatting the variables in the Performance Attribution dataset*/
+data Performance_Attrib;
 	Set Mergedstats(Keep=Sector BGWeights EDWeights Returns Index_weights Index_Returns);
 	Sector_P=BGWeights*Returns;
 	Sector_I=Index_Weights*Index_Returns;
