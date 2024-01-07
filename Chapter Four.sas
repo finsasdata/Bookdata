@@ -1,11 +1,10 @@
 ﻿/******************Program 4.1****************/
 /*Simulating Data from Bernoulli Distribution */
+%let prob=0.5; /*Probability of Success*/
 data simul1;
 	call streaminit(4321);/*Random seed generator*/
-	prob =0.5; /*Probability of Success*/
-
 	do i=1 to 100; /*Number of Iteration*/
-		Simnum =rand("Bernoulli", prob); /*Invoking the RAND function*/
+		Simnum =rand("Bernoulli", &prob); /*Invoking the RAND function*/
 		output; /*To the values from each iteration*/
 	end;
 run;
@@ -21,13 +20,14 @@ run;
 
 /******************Program 4.2****************/
 /*Simulating Data from Binomial Distribution */
+%let prob=0.5; /*Probability of Success*/
+%let num = 1; /*Number of trials*/
 data simul2;
 	call streaminit(4321);/*Random seed generator*/
-	prob =0.5; /*Probability of Success*/
 	num = 1;
 
 	do i=1 to 100; /*Number of Iteration*/
-		Simnum =rand("Binonmial", prob,num); /*Invoking the RAND function*/
+		Simnum =rand("Binonmial", &prob,&num); /*Invoking the RAND function*/
 		output; /*To the values from each iteration*/
 	end;
 run;
@@ -79,7 +79,7 @@ run;
 
 /******************Program 4.5****************/
 /*Simulating Stock Returns Using the Multivariate Normal Distribution */
-%let n=1000; /*number of repetitions or sample size*/
+%let n=5000; /*number of repetitions or sample size*/
 
 proc iml;
 	mean = {0.0215,-0.0038}; /*Mean Vector*/
@@ -89,11 +89,12 @@ proc iml;
 	MRET =RandNormal(&n,mean,vcv); /*Simulate 1000x2 vector*/
 	smean =mean(MRET); /*calculate sample mean*/
 	svcv = cov(MRET); /*calculate sample covariance*/
+	scorr =inv(sqrt(diag(svcv)))*svcv*inv(sqrt(diag(svcv)));/*calculate sample correlations*/
 	vname ={"AMZN","WMT"}; /*specify column and row label*/
 	print(MRET[1:5,])[colname=vname];
 	print(smean)[colname=vname] [label='Sample Mean'];
 	print(svcv)[colname=vname rowname=vname] [Label='Sample Covariance'];
-
+	print(scorr)[colname=vname rowname=vname] [Label='Sample Correlations'];
 	/*Following step creates a SAS dataset
 	(simul5) to store the simulated values*/
 	create simul5 from MRET[colname=vname];
@@ -114,25 +115,26 @@ run;
 /*Simulating High-Frequency Foreign Exchange Returns*/
 /*Simulating 10-minute FX Returns */
 data simul6;
-%let mu=-0.0000066;
-%let sigma=0.003600;
-    format Date datetime.; 
-    keep Date ret;
-    call streaminit(4321);
+	%let mu=-0.0000066;
+	%let sigma=0.003600;
+	format Date datetime.;
+	keep Date returns;
+	call streaminit(4321);
 	InitDate = '2Jan2021:00:00'dt;
 	dt=0;
-    do i = 1 to 1008;/*Number of 10 mins in one week*/
+
+	do i = 1 to 1008;/*Number of 10 mins in one week*/
 		dt+10;
-        	Date=	intnx('minutes',InitDate,dt);
-         Ret= rand('normal',&mu,&sigma);
-         output;
-      end;
+		Date=	intnx('minutes',InitDate,dt);
+		Returns= rand('normal',&mu,&sigma);
+		output;
+	end;
 run;
 proc sgplot data=simul6;
 	inset "USD/EUR Exchange Rate"/title="Simulated Ten-Minutes FX Returns" position=top 
 		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
 		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
-	series x=date y=Ret;
+	series x=date y=Returns;
 	xaxis label= "Date" valuesformat= datetime.;
 	yaxis label= "Returns" valuesformat= percent8.2 values=(-0.02 to 0.02 by .01);
 run;
@@ -269,7 +271,7 @@ run;
 
 /*Simulating Daily CBOE VIX Index Ornstein-Uhlenbeck Process*
 /*Numerical Solution*/
-%let N=730;
+%let N=364;
 %let sigma=2.412801;
 %let alpha=13.8262;
 %let beta=0.97559;
@@ -311,7 +313,7 @@ run;
 
 /******************Program 4.9B****************/
 /*Simulating Daily CBOE Volatility (VIX) Index Using AR(1) Model*/
-%let N=730;
+%let N=364;
 %let sigma=2.412801;
 %let mu=13.8262;
 %let beta=0.97559;
@@ -338,6 +340,10 @@ proc iml;
 	append from Vol;
 	close simul9B;
 quit;
+ data simulx;
+ set simul9B;
+ format Date mmddyy10.;
+ run;
 
 proc sgplot data=simul9B;
 	inset "Discretized OU Process - AR(1)"/title="Simulating CBOE Volatility (VIX) Index" position=top 
@@ -465,7 +471,7 @@ title 'ABA Manufacturing Inc.';
 title2 'Capital Expenditure Worksheet ';
 
 proc computab data=pinfo out=capbud2;
-	cols YR0 YR1 YR2 YR3 YR4 /'Year' f=10.2;
+	col YR0 YR1 YR2 YR3 YR4 /'Year' f=10.2;
 	col  YR0/ 'Zero' zero=' ';
 	col  YR1/ 'One';
 	col  YR2/ 'Two';
@@ -546,18 +552,18 @@ Decisions:
 	irr=cf;
 colcalc2:
 	if npv then do;
-		temp1 =finance('npv',rr,yr1, yr2, yr3, yr4)+yr0;
-		yr0=temp1;
+		tempnpv =finance('npv',rr,yr1, yr2, yr3, yr4)+yr0;
+		yr0=tempnpv;
 		yr1=0;
 		yr2=0;
 		yr3=0;
 		yr4=0;
-		yr5=0;
+	
 	end;
 
 	if IRR then do;
-		temp2 =finance('irr',yr0, yr1, yr2, yr3, yr4);
-		yr0=temp2;
+		tempirr =finance('irr',yr0, yr1, yr2, yr3, yr4);
+		yr0=tempirr;
 		yr1=0;
 		yr2=0;
 		yr3=0;
@@ -675,8 +681,8 @@ title2;
 	colcalc2:
 
 			if npv then do;
-				temp1 =finance('npv',rr,yr1, yr2, yr3, yr4)+yr0;
-				yr0=temp1;
+				tempnpv =finance('npv',rr,yr1, yr2, yr3, yr4)+yr0;
+				yr0=tempnpv;
 				yr1=0;
 				yr2=0;
 				yr3=0;
@@ -685,8 +691,8 @@ title2;
 			end;
 
 			if IRR then do;
-				temp2 =finance('irr',yr0, yr1, yr2, yr3, yr4);
-				yr0=temp2;
+				tempirr =finance('irr',yr0, yr1, yr2, yr3, yr4);
+				yr0=tempirr;
 				yr1=0;
 				yr2=0;
 				yr3=0;
