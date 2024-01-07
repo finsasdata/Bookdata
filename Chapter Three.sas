@@ -183,12 +183,14 @@ run;
 /*Testing for Stationarity in US Real GDP*/
 proc autoreg data= gdp;
 	model y= /  				/*Log US Real GDP*/
-	stationarity=(adf=(1 2 3),pp=(1 2 )); 		/*adf-Augmented Dickey-Fuller*/
-run; 						/*pp-Phillips-Perron*/
+	stationarity=(adf=(1 2 3),pp=(1 2 ));
+
+	/*adf-Augmented Dickey-Fuller //pp-Phillips-Perron*/
+run;
 
 quit;
 
-/****************Program 3.103****************/
+/****************Program 3.10****************/
 /*Creating Stationary Series Using PROC ARIMA*/
 ods graphics on;
 
@@ -213,7 +215,7 @@ run;
 title;
 
 /****************Program 3.12****************/
-/*Examining Jumps in S&P 500 Index*/
+/*Examining Jumps in S&P 500 Index Returns*/
 %datapull(jumps,jumps.sas7bdat);
 
 proc gam data=jumps plots=components(clm);
