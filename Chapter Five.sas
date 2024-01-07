@@ -105,29 +105,45 @@ title;
 /******************Program 5.4****************/
 /*Simulating Data from Special Cases Of GPD*/
 %let n = 1000;
-%let theta =0.08359;
-%let xi = 0.0036013;
+%let sigma =0.03153; 
+%let xi = 0.0000000105367;
+%let xuni=-1;
+%let psigma=%sysevalf(&sigma/&xi);
+%let pxi=%sysevalf(1/&xi);
 
 data GPD;
+call streaminit(4321);
 	do i = 1 to &n;
-
-		/* Generalized Pareto(scale=theta, shape=xi) */
-		u = rand("Uniform");
-		Xuni = &theta/&xi *(u**(-&xi)-1);
-		Xexp =rand("exponential", &theta);
+		/* Generalized Pareto Parameters(scale=sigma, shape=xi) */
+		u = rand('uniform');	
+		xuni = u;	
+		xexp=rand('exponential', &sigma);
+		xpd=rand('pareto',&pxi,&psigma)-&psigma;		
+		xguni=&sigma/&xuni*(u**(-&xuni)-1);
+		xgexp=-&sigma*log(u);
+		xgpd = &sigma/&xi *(u**(-&xi)-1);
 		output;
 	end;
 
 	drop i;
 	label 
-		xuni =' Uniformly Distributed Return'
-		Xexp = 'Exponentially Distributed Returns';
+		xuni =' Uniformly Distributed Returns'
+		xexp = 'Exponentially Distributed Returns'
+		xpd= ='Pareto Distributed Returns'
+		xguni= 'Uniform Generalized Pareto Distributed Returns'
+		xgexp ='Exponential Generalized Pareto Distributed Returns'
+		xgpd = 'Generalized Pareto Distributed Returns';
 run;
 
+ods graphics on;
 proc univariate data=gpd;
-	var xuni xexp;
-	histogram xuni/ pareto;
+	var  xuni xexp xpd xguni xgexp xgpd ;
+	histogram xuni/pareto;
 	histogram xexp/pareto;
+	histogram xpd/pareto(sigma=&sigma alpha=&xi);
+	histogram xguni/ pareto (sigma=&sigma alpha=&xuni);
+	histogram xgexp/pareto(sigma=&sigma alpha=&xi);
+	histogram xgpd/pareto(sigma=&sigma alpha=&xi);
 	ods select Histogram ParameterEstimates;
 run;
 
@@ -165,19 +181,19 @@ run;
 /*Creating macro variable with data step*/
 data _null_;
 	set sevest;
-	call symput('stheta',theta);
+	call symput('ssigma',theta);
 	call symput('sxi',xi);
 run;
 
 /******************Program 5.7****************/
 /*Calculating GPD VaR*/
 data gpdvar;
-	VaR90= &mu-&stheta*log((37*0.1/187));
-	VaR95= &mu-&stheta*log((37*0.05/187));
-	VaR99= &mu-&stheta*log((37*0.01/187));
-	ES90 = Var90/(1-&sxi)+(&stheta-&sxi*&thresh)/(1-&sxi);
-	ES95 = Var95/(1-&sxi)+(&stheta-&sxi*&thresh)/(1-&sxi);
-	ES99 = Var99/(1-&sxi)+(&stheta-&sxi*&thresh)/(1-&sxi);
+	VaR90= &mu-&ssigma*log((37*0.1/187));
+	VaR95= &mu-&ssigma*log((37*0.05/187));
+	VaR99= &mu-&ssigma*log((37*0.01/187));
+	ES90 = Var90/(1-&sxi)+(&ssigma-&sxi*&thresh)/(1-&sxi);
+	ES95 = Var95/(1-&sxi)+(&ssigma-&sxi*&thresh)/(1-&sxi);
+	ES99 = Var99/(1-&sxi)+(&ssigma-&sxi*&thresh)/(1-&sxi);
 	label
 		var90 ='90% VaR' var95 ='95% VaR' var99 ='99% VaR'
 		es90 ='90% Expected Shortfall' es95 ='95% Expected Shortfall' es99 ='99% Expected Shortfall';
@@ -254,7 +270,7 @@ title;
 /*Simple Bootstrapping using SURVEY SELECT*/
 %datapull(spx_ret,spx_ret.sas7bdat);
 
-proc surveyselect data=spx_ret out=bootsamp1
+proc surveyselect data=spx_ret out=bootsamp1 
 	method=urs sampsize=12 reps=1000 seed=12345;
 run;
 
@@ -371,14 +387,18 @@ data optionv;
 		vol	=	'Volatility'
 		time	=	'Time'
 		C ='Call Price'
-		P ='Put Price';
-	format rf percent8.2 vol percent8.2 time best8.2;
+		P ='Put Price'
+		sc ='Synthetic Call'
+		sp ='Synthetic Put';
+	format rf percent8.2 vol percent8.2 time best8.2 c dollar8.2 p dollar8.2 sc dollar8.2 sp dollar8.2;
+	sc=p+price-XP*exp(-rf*time);
+	sp=c-price+XP*exp(-rf*time);
 run;
 
 proc print data=optionv noobs label;
-	title 'Valuing S&P 500 Index Options';
+	title 'Valuing Equity Options on the S&P 500 Index';
 	var XP	rf	price vol time;
-	var c p /style(data)=[fontweight=bold  backgroundcolor=liggr];
+	var c p  /style(data)=[fontweight=bold  backgroundcolor=liggr];
 run;
 
 title;
@@ -417,25 +437,26 @@ data optionvalue;
 	CallP =BLKSHCLPRC(&price,exp,&price,&rf,sigma);
 	PutP  =BLKSHPTPRC(&price,exp,&price,&rf,sigma);
 	Label CallP = 'Call Price' PutP='Put Price' Sigma ='Volatility';
-	format Sigma percent8.2;
+	*format Sigma percent8.2;
 run;
 
+title 'Valuing Equity Options on the S&P 500 Index';
 proc tabulate data=optionvalue;
 	var Sigma CallP PutP;
-
-	table  (mean stderr ),(Sigma*F=percent8.2  CallP PutP);
+	table  (mean stderr ),(Sigma*F=percent8.2  CallP*F=dollar8.2 PutP*F=dollar8.2);
 		Label CallP = 'Call Price' PutP='Put Price' Sigma ='Volatility';
 		Keylabel StdErr='SE';
 run;
 
 proc sgplot data=optionvalue;
-	inset "Block Bootstrapping Stock Return Volatility"/title=" Distribution of One Month S&P 500 Index Option Prices" position=top 
+	inset "Block Bootstrapped Stock Return Volatility"/title=" Distribution of One Month S&P 500 Index Option Prices" position=top 
 		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
 		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
 	histogram CallP/ nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=blue );
 	histogram PutP/ nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=depk);
 	density CallP/ legendlabel= "(Normal Density Plot for Call Prices)";
 	density PutP/ legendlabel= "(Normal Density Plot for Put Prices)";
-	yaxis values=(0 to 35 by 5);
-	xaxis  label= 'Option Prices';
+	yaxis values=(0 to 35 by 5) ;
+	xaxis  label= 'Option Prices' valuesformat=dollar8.2;
 run;
+title;
