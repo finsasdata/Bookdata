@@ -70,7 +70,7 @@ data _null_;
 run;
 
 /******************Program 1.6****************/
-Proc datasets library=findata;
+proc datasets library=findata;
 run;
 
 quit;
