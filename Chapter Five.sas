@@ -289,7 +289,8 @@ proc means data=bootstats1 mean stderr;
 run;
 
 proc sgplot data=bootstats1;
-	inset "Basic Bootstrapping (URS)"/title=" Distribution of Sample Means of S&P 500 Monthly Returns" position=top 
+	inset "Basic Bootstrapping (URS)"/title="Distribution of the Sample Means of Bootstrapped S&P 500 Index Monthly Returns
+" position=top 
 		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
 		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
 	histogram mret_mean/ nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=blue );
@@ -306,7 +307,7 @@ data aspx_ret;
 run;
 
 proc surveyselect data=aspx_ret out=bootsamp2
-	method=urs sampsize=1 reps=1000 seed=12345;
+	method=urs sampsize=10 reps=1000 seed=12345;
 	cluster block;
 run;
 
@@ -326,6 +327,16 @@ ods exclude none;
 proc means data=bootstats2 mean stderr;
 	var mret_Mean;
 run;
+proc sgplot data=bootstats2;
+	inset "Block Bootstrapping (RS)"/title="Distribution of the Sample Means of Bootstrapped S&P 500 Index Monthly Returns" position=top 
+		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
+		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
+	histogram mret_mean/ nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=blue );
+	density mret_mean/ legendlabel= "(Normal Density Plot for Sample Means)";
+	yaxis values=(0 to 25 by 5);
+run;
+
+
 
 /******************Program 5.11B****************/
 /*Block Bootstrapping Using IML*/
@@ -361,10 +372,10 @@ proc iml;
 quit;
 
 proc sgplot data=bootstats3;
-	inset "Block Bootstrapping (RS)"/title=" Distribution of Sample Means of S&P 500 Monthly Returns" position=top 
+	inset "Block Bootstrapping (RS)"/title="Distribution of the Sample Means of Bootstrapped S&P 500 Index Monthly Returns" position=top 
 		textattrs=(family="Times New Roman" color=darkblue size=12 ) valuealign=center 
 		titleattrs=(family="Times New Roman" color=darkblue size=12 weight=bold) labelalign=center;
-	histogram col1/ nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=blue );
+	histogram col1/nbins=20 dataskin=matte fill transparency=0.8 fillattrs=(color=blue );
 	density col1/ legendlabel= "(Normal Density Plot for Sample Means)";
 	yaxis values=(0 to 25 by 5);
 	xaxis  label= 'Mean';
