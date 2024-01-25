@@ -1,6 +1,6 @@
 ﻿
 /*********Program 7.1**************************************/
-/*Importing dataset into your SAS Environment*/
+/*Importing Required Data Sets into Your SAS Environment*/
 %datapull(spxraw,spxraw.sas7bdat);
 %datapull(spxscore,spxscore.sas7bdat);
 data emsas.spxraw ;set work.spxraw ;run;
@@ -8,7 +8,7 @@ data emsas.spxscore ;set work.spxscore;run;
 
 
 /*********Program 7.2A**************************************/
-/*Classifying Stock Market Direction Using High Performance Logistic Regression */
+/*Classifying Stock Market Directions Using High Performance Logistic Procedure */
 /*Use Macro Variable to create list of predictor variable*/
 %let var_list=CCSIBBB	CFDTR	CFXRATE	CHIST_CALL_IMP_VOL	CHIST_PUT_IMP_VOL CINJCJC	CLEI	CMF_NET_BLCK CMF_NET_NON_BLCK	CMOV_AVG_10D CMOV_AVG_30D	CMOV_AVG_5D COPEN_INT_TOTAL_CALL	COPEN_INT_TOTAL_PUT CPE_RATIO CPX_LAST	CPX_OPEN;	
 
@@ -26,7 +26,7 @@ run;
 	 
 
 /*********Program 7.2B**************************************/
-/*Comparing Prediction to Actual Outcomes*/
+/*Comparing Predicted to Actual Outcomes*/
 proc sort data=plogout; by dates; run;
 proc sort data=emsas.spxrawp; by dates;run;
 data logout;
@@ -61,7 +61,7 @@ run;
 
 
 /*********Program 7.3**************************************/
-/*Classifying Stock Market Direction Using High Performance GLM */
+/*Classifying Stock Market Directions Using High Performance GLM Procedure */
 proc hpgenselect data=EMSAS.SPXRAWP;
 	class Target;
 	id dates partition;
@@ -105,7 +105,7 @@ run;
 
 
 /*********Program 7.4**************************************/
-/*Classifying Stock Market Direction Using HP Neural Network*/
+/*Classifying Stock Market Directions Using HP Neural Network Procedure*/
 /*Creating numeric partition variable*/
 data emsas.spxrawn;
 set emsas.spxrawp;
@@ -159,7 +159,7 @@ run;
 
 
 /*********Program 7.5**************************************/
-/*Classifying Stock Market Direction Using HP Decision Tree*/
+/*Classifying Stock Market Directions Using HP Decision Tree Procedure*/
 ods graphics on;
 proc hpsplit data=emsas.spxrawp  maxbranch=2 splitonce
 	intervalbins=100 maxdepth=10 mincatsize=1 mindist=0.01 alpha=0.2 leafsize=1 nsurrogates=0
@@ -208,7 +208,7 @@ run;
 
 
 /*********Program 7.6**************************************/
-/*Classifying Stock Market Direction Using HP SVM*/
+/*Classifying Stock Market Direction Using HP Support Vector Machines Procedure*/
 ods graphics on;
 
 proc hpsvm data=emsas.spxrawp method=ipoint;
@@ -270,7 +270,7 @@ run;
 
 
 /*********Program 7.7**************************************/
-/*Classifying Stock Market Direction Using HP Random Forest*/
+/*Classifying Stock Market Directions Using HP Random Forest Procedure*/
 ods graphics on;
 
 proc hpforest data=emsas.spxrawp 
@@ -327,19 +327,19 @@ run;
 
 	
 /*********Program 7.8**************************************/
-/*Classifying Stock Market Direction Using Ensemble Model*/
+/*Classifying Stock Market Directions Using Ensemble Model*/
 %datapull(Ensemble,Ensemble.sas);/*Pull Ensemble Codes from GitHub*/
 data PEnsemble;
 set emsas.spxrawp;
 %include "%sysfunc(pathname(work))/Ensemble.sas";
 /*Ensemble Code includes scoring from previous models 
 HPLOGISTICS, HPGENSELECT, HPNEURAL, HPTREE, HPSVM*/
-/***Average of Posterior probabilities from each model is calculated**
+/***Average of the Posterior probabilities from the models is first calculated**
  **Classification is then performed using the 50% threshold***/
 run;
 
 /*Comparing Prediction to Actual Outcomes*/
-Data Ensembleout;
+data Ensembleout;
 set PEnsemble;
 /**********************************
 Same code as Program 7.2B
@@ -366,7 +366,7 @@ run;
 
 
 /*********Program 7.9A**************************************/
-/*Print Summary of Estimation Fit Statistics*/
+/*Print the Summary of the Fit Statistics from the Estimations*/
 proc print data=logstats;
 	title 'Logistic Regression Statistics';
 
@@ -494,7 +494,7 @@ run;
 
 
 /*********Program 7.14A**************************************/
-/*Backtesting Champion Model Using Scoring Code*/
+/*Backtesting the Champion Model Using its Scoring Code*/
 /*Pull Scoring Code for Ensemble Model from GitHub*/
 %datapull(Ensemble,Ensemble.sas);
 
