@@ -43,7 +43,7 @@ ods graphics on;
 proc loess data=industr plots=all;
 	model finance=mrp/ all details  degree=1 
 		smooth=0.1;
-	score data=finsas.finscore /clm print(var=finance);
+	score data=finscore /clm print(var=finance);
 run;
 
 
