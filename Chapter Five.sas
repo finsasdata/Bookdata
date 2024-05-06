@@ -1,6 +1,4 @@
-﻿
-
-/******************Program 5.1****************/
+﻿/**************Program 5.1****************/
 /*Simulating Maximum and Minimum values of Index returns*/
 %let mu=0.0067658;
 %let ssd =0.04465726;
