@@ -168,6 +168,25 @@ data exspx;
 run;
 
 /******************Program 5.6****************/
+
+/*Estimating parameters of distribution using PROC UNIVARIATE*/
+proc univariate data=exspx outtable=PET ;
+var exmret;
+histogram/pareto;
+ods output ParameterEstimates=gpdest FitQuantiles=FQ;
+ods select Histogram ParameterEstimates ;
+run;
+
+/*Estimating parameters of distribution using PROC NLMIXED*/
+proc nlmixed tech=trureg  data=exspx MAXFUNC=900 MAXITER=900;
+parms nxi 0.01 theta=0.010 ;
+title 'Generalized pareto distribution ';
+bounds 0 < theta nxi;
+xx=(1/theta)*(1+(nxi*(exmret))/theta)**(-(1+(1/nxi)));
+ll=log(xx);
+model exmret~general(ll);
+run;
+
 /*Estimating parameters of distribution using PROC SEVERITY*/
 proc severity data=exspx crit=aicc outest=sevest(where=( _type_='EST')) 
 	print=all plots (histogram)= all;
