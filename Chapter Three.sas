@@ -1,3 +1,24 @@
+/*****************************************/
+/* Financial Data Science with SAS       */
+/* SAS Codes for Chapter Four Examples   */
+/*****************************************/
+
+/*Run the datapull macro below (if you have not already done so) before running the remaining programs.
+
+/**********Datapull Macro********************/
+%macro datapull(fref,pname);
+	filename  &fref "%sysfunc(getoption(WORK))/&pname";
+
+	proc http
+		url="https://github.com/finsasdata/Bookdata/raw/main/&pname"
+		out=&fref
+		method ="get";
+	run;
+
+%mend datapull;
+
+/**********************************************/
+
 
 /****************Program 3.1****************/
 %datapull(rspx,rspx_monthly.sas7bdat);
