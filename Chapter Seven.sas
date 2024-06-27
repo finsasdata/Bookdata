@@ -1,10 +1,44 @@
 ﻿
+/*****************************************/
+/* Financial Data Science with SAS       */
+/* SAS Codes for Chapter Seven Examples  */
+/*****************************************/
+
+/******Important Information**************/
+
+/*The exercise in this chapter can only be completed in a SAS Studio or
+SAS Enterprise Guide environment which also has a SAS Enterprise Miner license. The example below was 
+completed in the SAS Studio environment of SAS OnDemand for Academics.
+You will need to modify some areas of the code for it work in your environment.
+Review the program first before running it./
+/*The areas to be modified indicated with capitalized comments*/
+
+
+/*Run the the datapull macro (if you have not already done so) below before running the remaining programs.
+
+/**********Datapull Macro********************/
+%macro datapull(fref,pname);
+	filename  &fref "%sysfunc(getoption(WORK))/&pname";
+
+	proc http
+		url="https://github.com/finsasdata/Bookdata/raw/main/&pname"
+		out=&fref
+		method ="get";
+	run;
+
+%mend datapull;
+
+/**********************************************/
+
+
+
 /*********Program 7.1**************************************/
 /*Importing Required Data Sets into Your SAS Environment*/
 %datapull(spxraw,spxraw.sas7bdat);
 %datapull(spxscore,spxscore.sas7bdat);
 data emsas.spxraw ;set work.spxraw ;run;
 data emsas.spxscore ;set work.spxscore;run;
+
 
 
 /*********Program 7.2A**************************************/
