@@ -1,3 +1,25 @@
+/*****************************************/
+/* Financial Data Science with SAS       */
+/* SAS Codes for Chapter Six Examples   */
+/*****************************************/
+
+/*Run the datapull macro below (if you have not already done so) before running the remaining programs.
+
+/**********Datapull Macro********************/
+%macro datapull(fref,pname);
+	filename  &fref "%sysfunc(getoption(WORK))/&pname";
+
+	proc http
+		url="https://github.com/finsasdata/Bookdata/raw/main/&pname"
+		out=&fref
+		method ="get";
+	run;
+
+%mend datapull;
+
+/**********************************************/
+
+
 
 /*********Program 9.1**************************************/
 /*Maximizing Portfolio Return in the Mean-Variance Optimization using Proc OPTMODEL*/
