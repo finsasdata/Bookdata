@@ -1,3 +1,25 @@
+/*****************************************/
+/* Financial Data Science with SAS       */
+/* SAS Codes for Chapter Four Examples   */
+/*****************************************/
+
+/*Run the datapull macro below (if you have not already done so) before running the remaining programs.
+
+/**********Datapull Macro********************/
+%macro datapull(fref,pname);
+	filename  &fref "%sysfunc(getoption(WORK))/&pname";
+
+	proc http
+		url="https://github.com/finsasdata/Bookdata/raw/main/&pname"
+		out=&fref
+		method ="get";
+	run;
+
+%mend datapull;
+
+/**********************************************/
+
+
 /******************Program 2.1****************/
 /*Reading JSON File into SAS*/
 filename compinfo "%sysfunc(getoption(WORK))/company_tickers_exchange.json";
@@ -421,7 +443,7 @@ title;
 proc template;
 	define statgraph barchart2;
 		begingraph;
-			entrytitle "Portfolio Income  By Sectors";
+			entrytitle "Portfolio Income By Sectors";
 			layout overlay;
 				barchart category=Sector  response=income / name="pdisplay"
 					stat=sum display=all orient=horizontal group=mcapc;
