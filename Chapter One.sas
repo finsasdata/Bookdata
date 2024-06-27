@@ -1,3 +1,10 @@
+/*****************************************/
+/* Financial Data Science with SAS       */
+/* SAS Codes for Chapter One Examples   */
+/*****************************************/
+
+/*Run the datapull macro below (if you have not already done so) before running the remaining programs.
+
 /******************Program 1.1****************/
 data SP500FIN;
 	input  Date MMDDYY10. SPS EPS DPR PE;
