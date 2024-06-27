@@ -1,6 +1,6 @@
 /*****************************************/
 /* Financial Data Science with SAS       */
-/* SAS Codes for Chapter Four Examples   */
+/* SAS Codes for Chapter Two Examples    */
 /*****************************************/
 
 /*Run the datapull macro below (if you have not already done so) before running the remaining programs.
