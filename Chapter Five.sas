@@ -5,7 +5,6 @@
 
 /*Run the datapull macro below (if you have not already done so) before running the remaining programs.
 
-
 /**********Datapull Macro********************/
 %macro datapull(fref,pname);
 	filename  &fref "%sysfunc(getoption(WORK))/&pname";
