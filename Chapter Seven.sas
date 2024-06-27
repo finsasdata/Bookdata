@@ -14,7 +14,7 @@ Review the program first before running it./
 /*The areas to be modified indicated with capitalized comments*/
 
 
-/*Run the the datapull macro (if you have not already done so) below before running the remaining programs.
+/*Run the datapull macro below (if you have not already done so) before running the remaining programs.
 
 /**********Datapull Macro********************/
 %macro datapull(fref,pname);
