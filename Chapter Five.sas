@@ -1,4 +1,27 @@
-﻿/**************Program 5.1****************/
+﻿/*****************************************/
+/* Financial Data Science with SAS       */
+/* SAS Codes for Chapter Five Examples   */
+/*****************************************/
+
+/*Run the the datapull macro (if you have not already done so) below before running the remaining programs.
+
+
+/**********Datapull Macro********************/
+%macro datapull(fref,pname);
+	filename  &fref "%sysfunc(getoption(WORK))/&pname";
+
+	proc http
+		url="https://github.com/finsasdata/Bookdata/raw/main/&pname"
+		out=&fref
+		method ="get";
+	run;
+
+%mend datapull;
+
+/**********************************************/
+
+
+/**************Program 5.1****************/
 /*Simulating Maximum and Minimum values of Index returns*/
 %let mu=0.0067658;
 %let ssd =0.04465726;
