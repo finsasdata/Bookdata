@@ -36,7 +36,7 @@ ods graphics on;
 
 proc freq  data=simul1;
 	table Simnum/
-		plots = freqplots;
+		plots = freqplot;
 run;
 
 
@@ -59,7 +59,7 @@ ods graphics on;
 
 proc freq  data=simul2;
 	table Simnum/
-		plots = freqplots;
+		plots = freqplot;
 run;
 
 /******************Program 4.3****************/
