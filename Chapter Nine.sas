@@ -330,7 +330,7 @@ data EFrontier;
 run;
 
 proc sgplot data=Efrontier;
-	title "Optimal Portfolio Allocations With Six-Three Assets Portfolio";
+	title "Optimal Portfolio Allocations With Sixty-Three Stock Universe";
 	lineparm x=0 y=&rfr slope=&max_sharpe /lineattrs=graphdata6(thickness=4)   legendlabel='Capital Allocation Line';
 	series x=Risks Y=Returns/ legendlabel='Efficient Frontier' lineattrs=graphdata1(thickness=3 color=bippk );
 scatter x=RRisks Y=RReturns/legendlabel='Unoptimized Random Portfolios' markerattrs=(color=bipb symbol=circlefilled size=3 pt);
