@@ -424,6 +424,7 @@ impvar TE{i in FUND}=sum{j in FACTOR}(preturns[i]-Weights[j]*factors[i,j])**2;
 		Weights=Weights;
 create data RSquarecal from [date]={i in FUND} TE=TE PReturns= preturns;
 quit;
+
 proc iml;
 	use Rsquarecal;
 	read  all into RR[colname=NumerNames];
@@ -433,3 +434,10 @@ proc iml;
 	RSquare=1-VCV[1,1]/VCV[2,2];
 	print RSquare[ format=percent8.2];
 quit;
+
+proc sgplot data=factweight;
+	title1 font=swissb height=2 'Return-Based Style Analysis';
+	title2 font=swissb height=2 '(Quadratic Programming)';
+	vbar  Factors / response=Weights colorresponse=Weights dataskin=crisp legendlabel='Weights';
+	yaxis min=-1.0;
+run;
