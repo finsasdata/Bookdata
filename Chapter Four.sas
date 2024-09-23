@@ -304,7 +304,7 @@ proc iml;
 	mu=&alpha/theta; /*Mu is calculated from regression alpha called */
 	xj= j(&n,1,.); /*vector random variables*/
 	Volt=j(&n,1,0); /*Interest rate vector*/
-	Vol=j(&n,2,&mu); /*Vector to merge simulate rates and date*/
+	Vol=j(&n,2,mu); /*Vector to merge simulate rates and date*/
 	InitDate = '1jan2021'd; /*Initial Date*/
 	call randseed(4321);
 	call randgen(xj,"Normal");
@@ -381,7 +381,7 @@ run;
 %let smean=0.0067658;
 %let ssd = 0.04465726;
 %let inprice=3756.07;
-%let nreps=1000;/*number of repititions*/
+%let nreps=1000;/*number of repetitions*/
 
 data simul10;
 	format Date monyy.;
