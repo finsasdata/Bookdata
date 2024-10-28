@@ -375,6 +375,7 @@ proc sgpie data=holdings;
  pie bond / response=holdings datalabelloc=callout ;
  format holdings dollar8.;
 run;
+title;
 
 
 
@@ -451,3 +452,4 @@ proc sgplot data=factweight;
 	vbar  Factors / response=Weights colorresponse=Weights dataskin=crisp legendlabel='Weights';
 	yaxis min=-1.0;
 run;
+title;
