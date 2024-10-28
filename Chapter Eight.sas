@@ -369,6 +369,16 @@ proc optmodel;
 		Holdings=Holdings;
 quit;
 
+proc sgpie data=holdings;
+	title1 font=swissb height=2 'Dollar Value of Bond Holdings';
+	title2 font=swissb height=2 '(Cash Flow Dedication ALM Optimization)';
+ pie bond / response=holdings datalabelloc=callout ;
+ format holdings dollar8.;
+run;
+
+
+
+
 	
 /*********Program 8.9**************************************/
 /*Solving QP using Interior Point Algorithm*/
