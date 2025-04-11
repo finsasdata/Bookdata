@@ -1,4 +1,3 @@
-
 data _null_;
 	idMaxLength=length("1");
 	idMaxLength=max(idMaxLength, length("2"));
