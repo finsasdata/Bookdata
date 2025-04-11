@@ -14,8 +14,7 @@
  */
 
 
-	by Target;
-	length Partition $ &idLength;
+
 	retain __tmp1-__tmp%trim(&count) __nobs__ __nobs1__ __nobs2__;
 	retain __nobs__ __seed__ _n1_;
 	drop __k__;
