@@ -1,4 +1,603 @@
-﻿/*********Program 7.9B**************************************/
+﻿/*********Program 7.1**************************************/
+/*Importing Required Data Sets into Your SAS Environment*/
+libname EMSAS "%sysfunc(pathname(work))";
+%datapull(spxraw, spxraw.sas7bdat);
+%datapull(spxscore, spxscore.sas7bdat);
+
+data emsas.spxraw;
+	set work.spxraw;
+run;
+
+data emsas.spxscore;
+	set work.spxscore;
+run;
+
+%datapull(DSplit, DSplit.sas);
+
+/*Pull Ensemble Codes from GitHub*/
+%include "%sysfunc(pathname(work))/DSplit.sas";
+options validvarname=any;
+ods noproctitle;
+ods graphics / imagemap=on;
+
+/* Scatter plot matrix macro */
+%macro scatterPlotMatrix(xVars=, title=, groupVar=);
+	proc sgscatter data=EMSAS.SPXSCORE;
+		matrix &xVars / %if(&groupVar ne %str()) %then
+			%do;
+				group=&groupVar legend=(sortorder=ascending) %end;
+		diagonal=(histogram);
+		title &title;
+	run;
+
+	title;
+%mend scatterPlotMatrix;
+
+%scatterPlotMatrix(xVars=Index_Ret OTO_FRet OTC_FRet, 
+	title="Scatter plot matrix", groupVar=);
+
+/*********Program 7.2A**************************************/
+/*Classifying Stock Market Directions Using High Performance Logistic Procedure */
+/*Use Macro Variable to create list of predictor variable*/
+%let var_list=CCSIBBB	CFDTR	CFXRATE	CHIST_CALL_IMP_VOL	CHIST_PUT_IMP_VOL	
+CINJCJC	CLEI CMF_NET_BLCK CMF_NET_NON_BLCK CMOV_AVG_10D	CMOV_AVG_30D	
+CMOV_AVG_5D	COPEN_INT_TOTAL_CALL COPEN_INT_TOTAL_PUT CPE_RATIO CPX_LAST CPX_OPEN	
+CPX_VOLUME CRSI_14D CRSI_3D	CRSI_9D	CUSYC3M10 CVIX CVOLATILITY_30D ;
+
+/* Label: HP Reg  */
+/*Classifying Stock Market Direction Using High Performance Logistic Regression */
+ods graphics on;
+
+proc hplogistic data=EMSAS.SPXRAWP;
+	id Dates Partition;
+	class Target;
+	model Target(event='1')=&var_list. /cutpoint=0.5 link=logit association 
+		ctable=ROC lackfit;
+	partition rolevar=partition(train='1' validate='2');
+	selection method=backward(slstay=0.1) details=all;
+	code file="%sysfunc(pathname(work))/logscore.sas" group=HPLOG;
+	output out=plogout /allstats;
+	ods output PartFitStats=logstats;
+run;
+
+/*********Program 7.2B**************************************/
+/*Comparing Prediction to Actual Outcomes*/
+proc sort data=plogout;
+	by dates;
+run;
+
+proc sort data=emsas.spxrawp;
+	by dates;
+run;
+
+data logout;
+	merge plogout emsas.spxrawp;
+	by dates;
+
+	/******************************************************************
+	The code below is repeated in other Models. Note: Pred vs PTarget1
+	 *******************************************************************/
+	if (Pred < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+
+	/*************************************************
+	End of repeated code
+	 **************************************************/
+	Model='HP Regression';
+run;
+
+proc sgplot data=Roc aspect=1 noautolegend;
+	title 'ROC Curve';
+	xaxis values=(0 to 1 by 0.25) grid offsetmin=.05 offsetmax=.05;
+	yaxis values=(0 to 1 by 0.25) grid offsetmin=.05 offsetmax=.05;
+	lineparm x=0 y=0 slope=1 / lineattrs=(color=ligr);
+	series x=FPF y=TPF/group=role;
+	inset 'Area under the curve=0.7706' / position=bottomright;
+run;
+
+/*********Program 7.3**************************************/
+/* Label: HP GLM */
+/*Classifying Stock Market Direction Using High Performance GLM Model */
+proc hpgenselect data=EMSAS.SPXRAWP;
+	class Target;
+	id dates partition;
+	partition role=Partition (validate='2');
+	model Target (event='1')=&var_list. /dist=binary link=probit;
+	selection method=backward(slstay=0.1) details=all;
+	output out=pglmout role=partrole / allstats;
+	code file="%sysfunc(pathname(work))/glmscore.sas" group=HPGLM;
+	ods output fitstatistics=glmstats(where=(Step is missing));
+run;
+
+proc sort data=pglmout;
+	by dates;
+run;
+
+proc sort data=emsas.spxrawp;
+	by dates;
+run;
+
+data glmout;
+	merge pglmout emsas.spxraw;
+	by dates;
+
+	/******************************************************************
+	Same as 7.2B
+	 *******************************************************************/
+	if (Pred < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+	Model='HP GLM';
+run;
+
+/*********Program 7.4**************************************/
+/* Label: HP Neural */
+/*Classifying Stock Market Direction Using High Performance Neural Network*/
+/*Creating numeric partition variable*/
+data emsas.spxrawn;
+	set emsas.spxrawp;
+	npartition=input(partition, 2.);
+run;
+
+ods graphics on;
+
+proc hpneural data=emsas.spxrawn;
+	architecture mlp;
+	input &var_list.;
+
+	/* Macrovariable  list*/
+	id dates partition;
+	target target/level=nom;
+	hidden 1/act=tanh;
+	train numtries=3 outmodel=model_spxwrap maxiter=1000;
+	weight _inverse_priors_;
+	partition rolevar=npartition(validate=2);
+	code file="%sysfunc(pathname(work))/neuralscore.sas";
+	score out=pneuralout;
+	ods output fitstatistics=neuralstats;
+run;
+
+/*Comparing Prediction to Actual Outcomes*/
+proc sort data=pneuralout;
+	by dates;
+
+proc sort data=emsas.spxrawn;
+	by dates;
+run;
+
+data neuralout;
+	merge pneuralout emsas.spxrawn;
+	by dates;
+
+	/******************************************************************
+	Same as 7.2B. Note: Pred vs PTarget1
+	 *******************************************************************/
+	if (P_Target1 < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+	drop npartition;
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+	Model='HP Neural';
+run;
+
+/*********Program 7.5**************************************/
+/* Label: HP Tree */
+/*Classifying Stock Market Direction Using HP Decision Tree*/
+ods graphics on;
+
+proc hpsplit data=emsas.spxrawp nodes=detail nsurrogates=0 maxbranch=2 
+		splitonce intervalbins=100 maxdepth=10 mincatsize=1 mindist=0.01 alpha=0.2 
+		leafsize=1 nsurrogates=0 assignmissing=popular plots=(zoomedtree(nodes=('D') 
+		depth=3 fractionprecision=2));
+	id dates partition;
+	class target;
+	model target (event='1')=&var_list.;
+	grow entropy;
+
+	/*Prune based on misclassification and select subtree with lowest misclassification*/
+	prune misc / min;
+	partition rolevar=partition(train='1' validate='2');
+	code file="%sysfunc(pathname(work))/splitscore.sas";
+	rules file="%sysfunc(pathname(work))/rules.txt";
+	output out=ptreeout;
+	ods output treePerformance=treestats;
+run;
+
+/*Comparing Predictions with Actual Outcome*/
+proc sort data=ptreeout;
+	by dates;
+run;
+
+data treeout;
+	merge ptreeout emsas.spxraw;
+	by dates;
+
+	/******************************************************************
+	Same as 7.2B. Note: Pred vs PTarget1
+	 *******************************************************************/
+	if (P_Target1 < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+	Model='HP Tree';
+run;
+
+/*********Program 7.6**************************************/
+/* Label: HP SVM */
+/*Classifying Stock Market Direction Using HP SVM*/
+ods graphics on;
+
+proc hpsvm data=emsas.spxrawp method=ipoint;
+	id dates partition;
+	input &var_list. /level=interval;
+	kernel polynom/ degree=3;
+	target target/;
+	penalty C=20.0;
+	partition rolevar=partition(validate='2');
+	code file="%sysfunc(pathname(work))/svmscore.sas";
+	output out=psvmout;
+	ods output fitstatistics=svmstats;
+run;
+
+/*Comparing Prediction to Actual Outcomes*/
+proc sort data=psvmout;
+	by dates;
+run;
+
+data svmout;
+	merge psvmout emsas.spxraw;
+	by dates;
+
+	/******************************************************************
+	Same as 7.2B. Note: Pred vs PTarget1
+	 *******************************************************************/
+	if (P_Target1 < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+	Model='HP SVM';
+run;
+
+/*********Program 7.7**************************************/
+/* Label: HP Forest */
+/*Classifying Stock Market Direction Using HP Random Forest*/
+ods graphics on;
+ods trace on;
+
+proc hpforest data=emsas.spxrawp maxtrees=100 vars_to_try=10 seed=12345 
+		inbagfraction=0.3 maxdepth=10 leafsize=1 alpha=0.05 scoreprole=oob;
+	id dates partition;
+	target target/level=binary;
+	input &var_list. /level=interval;
+
+	/* Macrovariable list*/
+	partition rolevar=partition(train='1' validate='2');
+	save file="%sysfunc(pathname(work))/forestscore.sas";
+	score out=pforestout;
+	ods output fitstatistics=pforeststats modelinfo=forestinfo;
+run;
+
+/*SAS Code to the obtain the fit statistics for the selected number of trees*/
+data _null;
+	set forestinfo(where=(parameter='Actual Trees'));
+	call symput("treenum", setting);
+run;
+
+data foreststats;
+	set pforeststats(where=(Ntrees=&treenum));
+run;
+
+/*Comparing Prediction to Actual Outcomes*/
+proc sort data=pforestout;
+	by dates;
+run;
+
+proc sort data=emsas.spxrawp;
+	by dates;
+run;
+
+data forestout;
+	merge pforestout emsas.spxrawp;
+	by dates;
+
+	/******************************************************************
+	Same as 7.2B. Note: Pred vs PTarget1
+	 *******************************************************************/
+	if (P_Target1 < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+	Model='HP Forest';
+run;
+
+/*********Program 7.8**************************************/
+/* Label: Ensemble */
+/*Classifying Stock Market Direction Using Ensemble Model*/
+%datapull(Ensemble, Ensemble.sas);
+
+/*Pull Ensemble Codes from Github*/
+data PEnsemble;
+	set emsas.spxrawp;
+	%include "%sysfunc(pathname(work))/Ensemble.sas";
+
+	/*Ensemble Code includes scoring from previous models
+	HPLOGISTICS, HPGENSELECT, HPNEURAL, HPTREE, HPSVM*/
+	/***Average of Posterior probabilities from each model is calculated**
+	 **Classification is then performed using the 50% threshold***/
+run;
+
+Data Ensembleout;
+	set PEnsemble;
+
+	/******************************************************************
+	Same as 7.2B. Note: Pred vs PTarget1
+	 *******************************************************************/
+	if (P_Target1 < 0.5) then
+		P_Target=0;
+	else
+		P_Target=1;
+	format Classification $10. Role $9. Model $15.;
+
+	if (Target=P_Target) then
+		Classification='Correct';
+	else
+		Classification='Incorrect';
+
+	if Partition='1' then
+		Role='Train';
+	else
+		Role='Validate';
+
+	if P_Target=1 and Target=1 then
+		TP=1;
+	else
+		TP='';
+
+	if P_Target=1 and Target=0 then
+		FP=1;
+	else
+		FP='';
+
+	if P_Target=0 and Target=1 then
+		FN=1;
+	else
+		FN='';
+
+	if P_Target=0 and Target=0 then
+		TN=1;
+	else
+		TN='';
+	label TP='True Positive' FP='False Positive' FN='False Negative' 
+		TN='True Negative';
+	Model='Ensemble';
+run;
+
+/*********Program 7.9A**************************************/
+/* Label: Model Comparison */
+/*Print Summary of Estimation Fit Statistics*/
+proc print data=logstats;
+	title 'Logistic Regression Statistics';
+
+proc print data=glmstats;
+	title 'GLM Regression Statistics';
+
+proc sgrender data=neuralstats template=HPDM.HPNEURAL.FitStatistics;
+	title 'Neural Network Statistics';
+
+proc print data=treestats;
+	title 'Decision Tree Statistics';
+
+proc sgrender data=svmstats template=HPDM.HPSvm.FitStatistics;
+	title 'Support Vector Machine Statistics';
+
+proc print data=foreststats;
+	title 'Random Forest Statistics';
+run;
+
+title;
+
+/*********Program 7.9B**************************************/
 /*Merging Predictions and Classifications for Further Analysis*/
 data Modelcomp1;
 	set logout(keep=dates model target role p_target classification TP FP FN TN) 
@@ -10,27 +609,14 @@ data Modelcomp1;
 		Ensembleout(keep=dates model target role p_target classification TP FP FN TN);
 run;
 
-/*
-data Modelcomp1;
-set
-treeout(keep=dates model target role p_target classification)
-svmout(keep=dates model target role p_target classification)
-logout(keep=dates model target role p_target classification)
-neuralout(keep=dates model target role p_target classification)
-treeout(keep=dates model target role p_target classification)
-glmout(keep=dates model target role p_target classification)
-forestout(keep=dates model target role p_target classification)
-Ensembleout(keep=dates model target role p_target classification);
-run;
-*/
-/*********Program 7.10**************************************/
-/*Plotting Classification Table for All Models*/
+/*Using Proc Tabulate to Compute the Classfication Accuracy*/
 proc tabulate data=Modelcomp1;
 	class model classification role;
 	table classification*(pctn<classification>=''), 
 		Model='Comparing Model Classification Accuracy'*role;
 run;
 
+/*********Program 7.10**************************************/
 /*Plotting Classification Table for All Model*/
 proc sort data=Modelcomp1 out=Plotdata;
 	by Model Role;
@@ -52,7 +638,7 @@ run;
 title;
 
 /*********Program 7.11**************************************/
-/*Using Proc Tabulate to Compute the Classification Matrix*/
+/*Using Proc Tabulate to Compute the Classfication Matrix*/
 proc tabulate data=Modelcomp1;
 	class model target p_target role;
 	table role*Target='Target', Model='Comparing Model Classification Matrix'*(pctn<P_Target>='Predicted')*P_Target='';
@@ -99,8 +685,6 @@ data Modelcomp3;
 	by dates;
 run;
 
-/*********Program 7.131B**************************************/
-/*Using PROC LOGISTICS to Compare ROC Curves*/
 %let _ROCOVERLAY_ENTRYTITLE = Comparing ROC Curves (Data Role=Train);
 
 proc logistic data=modelcomp3 (where=(role='Train'));
@@ -118,6 +702,7 @@ proc logistic data=modelcomp3 (where=(role='Train'));
 	/* roccontrast reference ('HPReg') /Estimate E;*/
 run;
 
+/*********Program 7.131B**************************************/
 %let _ROCOVERLAY_ENTRYTITLE = Comparing ROC Curves (Data Role=Validate);
 
 proc logistic data=modelcomp3 (where=(role='Validate'));
@@ -137,7 +722,7 @@ run;
 
 %symdel _ROC_ENTRYTITLE;
 
-/*********Program 7.14A**************************************/
+/*********Program 7.131B**************************************/
 /* Label: Score */
 /*Backtesting Champion Model Using Scoring Code*/
 /*Pull Scoring Code for Ensemble Model from GitHub*/
@@ -203,7 +788,7 @@ data scorespx;
 run;
 
 /*********Program 7.14B**************************************/
-/*Graphing Classification Accuracy Using PROC SGPLOT*/
+/*Graphic Classification Accuracy Using PROC SGPLOT*/
 ods graphics / reset width=6.4in height=4.8in imagemap;
 
 proc sgplot data=Scorespx;
@@ -282,8 +867,8 @@ proc report data=scorespx nowd;
 run;
 
 /*********Program 7.16**************************************/
-/* Using SGPLOT to Graph the Relationship Between Posterior Probabilities and Actual Index Return*/
-proc sgplot data=scorespx;
+/* Graphing the Relationship Between Posterior Probabilities and Actual Index Return*/
+Proc sgplot data=scorespx;
 	title height=12pt "Posterior Probabilities of Positive Market Movements";
 	scatter x=index_ret y=P_Target1/group=I_Target 
 		markeroutlineattrs=(thickness=1) markerattrs=(symbol=circlefilled size=10);
@@ -302,7 +887,3 @@ proc sgplot data=scorespx;
 run;
 
 title;
-
-
-
-
